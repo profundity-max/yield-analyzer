@@ -1,0 +1,228 @@
+/* ═══════════════════════════════════════════════════════════
+   Yield Analyzer Dashboard — Design System
+   Apple-style minimal · Navy Blue palette · Card grid
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  /* Colors */
+  --c-navy:        #0a2540;
+  --c-navy-light:  #1e3a8a;
+  --c-blue:        #2563eb;
+  --c-blue-light:  #3b82f6;
+  --c-blue-pale:   #dbeafe;
+  --c-blue-50:     #eff6ff;
+  --c-bg:          #f5f7fa;
+  --c-card:        #ffffff;
+  --c-border:      #e2e8f0;
+  --c-border-soft: #f1f5f9;
+  --c-text:        #0a2540;
+  --c-text-2:      #64748b;
+  --c-text-3:      #94a3b8;
+  --c-success:     #10b981;
+  --c-success-bg:  #d1fae5;
+  --c-warning:     #f59e0b;
+  --c-warning-bg:  #fef3c7;
+  --c-danger:      #dc2626;
+
+  /* Typography */
+  --font: -apple-system, "SF Pro Display", "SF Pro Text", "PingFang SC", "Helvetica Neue", sans-serif;
+}
+
+.stApp {
+  background: var(--c-bg);
+}
+
+section.main > div {
+  max-width: 1400px;
+  padding-top: 1.5rem;
+}
+
+/* ── Nav ───────────────────────────────────────────── */
+[data-testid="stSidebar"] {
+  background: white;
+  border-right: 1px solid var(--c-border);
+}
+[data-testid="stSidebarNav"] a {
+  color: var(--c-text-2);
+  font-size: 14px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  transition: all 0.15s;
+}
+[data-testid="stSidebarNav"] a:hover {
+  background: var(--c-blue-50);
+  color: var(--c-blue);
+}
+
+/* ── Typography ────────────────────────────────────── */
+h1, h2, h3, h4 { color: var(--c-navy); font-weight: 600; letter-spacing: -0.5px; }
+h1 { font-size: 32px; margin-bottom: 4px; }
+h2 { font-size: 24px; }
+h3 { font-size: 18px; }
+.stMarkdown p, .stMarkdown li { color: var(--c-text); }
+
+.subtitle { color: var(--c-text-2); font-size: 14px; font-weight: 400; }
+
+/* ── Card ──────────────────────────────────────────── */
+.ya-card {
+  background: var(--c-card);
+  border: 1px solid var(--c-border);
+  border-radius: 14px;
+  padding: 24px;
+  transition: box-shadow 0.2s;
+}
+.ya-card:hover { box-shadow: 0 4px 16px rgba(10,37,64,0.06); }
+
+.ya-card-title {
+  font-size: 13px;
+  color: var(--c-text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  font-weight: 500;
+  margin-bottom: 12px;
+}
+.ya-card-label {
+  font-size: 11px;
+  color: var(--c-text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 6px;
+}
+
+/* ── Hero (deep navy gradient) ─────────────────────── */
+.ya-hero {
+  background: linear-gradient(135deg, #0a2540 0%, #1e3a8a 100%);
+  color: white;
+  border: none;
+  position: relative;
+  overflow: hidden;
+}
+.ya-hero::after {
+  content: ''; position: absolute; top: -50%; right: -20%;
+  width: 200px; height: 200px;
+  background: radial-gradient(circle, rgba(37,99,235,0.4) 0%, transparent 70%);
+  border-radius: 50%;
+}
+.ya-hero .ya-card-label { color: #93c5fd; }
+.ya-hero .ya-card-title { color: #93c5fd; }
+.ya-hero-value {
+  font-size: 56px; font-weight: 200; letter-spacing: -2px;
+  margin: 8px 0 4px; color: white; line-height: 1;
+}
+.ya-hero-delta {
+  display: inline-block; padding: 4px 10px;
+  background: rgba(16,185,129,0.15);
+  color: #34d399; border-radius: 12px;
+  font-size: 12px; font-weight: 600;
+}
+.ya-hero-sub { color: #93c5fd; margin-top: 8px; font-size: 12px; }
+
+/* ── Stat values ───────────────────────────────────── */
+.ya-stat-value { font-size: 32px; font-weight: 500; color: var(--c-navy); letter-spacing: -0.8px; }
+.ya-stat-value.lg { font-size: 48px; font-weight: 300; letter-spacing: -1.2px; }
+.ya-stat-unit { font-size: 14px; color: var(--c-text-3); margin-left: 2px; }
+.ya-stat-extra { font-size: 12px; color: var(--c-text-3); margin-top: 4px; }
+.ya-stat-accent { color: var(--c-blue) !important; }
+.ya-stat-success { color: var(--c-success) !important; }
+
+/* ── Toggle (Apple-style pill) ─────────────────────── */
+.ya-toggle {
+  display: inline-flex; background: rgba(10,37,64,0.05);
+  border-radius: 20px; padding: 3px; margin-bottom: 16px;
+}
+.ya-toggle span {
+  padding: 6px 14px; font-size: 12px; border-radius: 16px;
+  color: var(--c-text-2); font-weight: 500; cursor: pointer;
+}
+.ya-toggle span.active {
+  background: white; color: var(--c-navy);
+  box-shadow: 0 1px 2px rgba(10,37,64,0.08);
+}
+
+/* ── Vendor bar ────────────────────────────────────── */
+.ya-vendor-row { display: flex; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--c-border-soft); }
+.ya-vendor-row:last-child { border-bottom: none; }
+.ya-vendor-name { width: 50px; font-size: 14px; font-weight: 600; color: var(--c-navy); }
+.ya-vendor-bar { flex: 1; height: 28px; background: var(--c-border-soft); border-radius: 6px; position: relative; margin: 0 16px; overflow: hidden; }
+.ya-vendor-fill { position: absolute; top: 0; left: 0; height: 100%; border-radius: 6px; }
+.ya-vendor-fill.ly { background: linear-gradient(90deg, #2563eb, #3b82f6); }
+.ya-vendor-fill.lk { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+.ya-vendor-yield { width: 80px; text-align: right; font-size: 14px; font-weight: 500; color: var(--c-navy); }
+
+/* ── Defect table ─────────────────────────────────── */
+.ya-table-row {
+  display: flex; padding: 12px 0;
+  border-bottom: 1px solid var(--c-border-soft);
+  font-size: 13px;
+}
+.ya-table-row.header { color: var(--c-text-2); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 500; }
+.ya-table-row .ya-c1 { flex: 1; color: var(--c-navy); }
+.ya-table-row .ya-c2 { width: 100px; text-align: right; font-weight: 500; color: var(--c-navy); }
+.ya-table-row .ya-c3 { width: 80px; text-align: right; color: var(--c-danger); font-weight: 500; }
+.ya-table-row.header .ya-c1, .ya-table-row.header .ya-c2, .ya-table-row.header .ya-c3 { color: var(--c-text-2); }
+
+/* ── Hide Streamlit default chrome ─────────────────── */
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+header [data-testid="stToolbar"] { display: none; }
+.stDeployButton { display: none; }
+
+/* ── Buttons ───────────────────────────────────────── */
+.stButton > button {
+  background: var(--c-blue);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 18px;
+  font-weight: 500;
+  transition: all 0.15s;
+}
+.stButton > button:hover { background: var(--c-blue-light); }
+.stButton > button[kind="secondary"] {
+  background: var(--c-border-soft); color: var(--c-text); border: 1px solid var(--c-border);
+}
+.stDownloadButton > button {
+  background: var(--c-navy); color: white; border: none; border-radius: 8px;
+}
+.stDownloadButton > button:hover { background: var(--c-navy-light); }
+
+/* ── Metrics ───────────────────────────────────────── */
+[data-testid="stMetricValue"] { font-size: 32px; font-weight: 500; color: var(--c-navy); letter-spacing: -0.8px; }
+[data-testid="stMetricLabel"] { color: var(--c-text-2); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* ── Alerts ────────────────────────────────────────── */
+.stAlert { border-radius: 10px; border: 1px solid var(--c-border); }
+
+/* ── Defect list (new layout) ─────────────────────── */
+.ya-defect-row {
+  display: flex; align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--c-border-soft);
+  font-size: 13px;
+}
+.ya-defect-row:last-child { border-bottom: none; }
+.ya-defect-rank { width: 20px; color: var(--c-text-3); font-weight: 500; }
+.ya-defect-name { width: 110px; color: var(--c-navy); font-weight: 500; }
+.ya-defect-bar { flex: 1; height: 6px; background: var(--c-border-soft); border-radius: 3px; margin: 0 12px; overflow: hidden; }
+.ya-defect-fill { height: 100%; background: linear-gradient(90deg, #2563eb, #3b82f6); border-radius: 3px; }
+.ya-defect-count { width: 60px; text-align: right; color: var(--c-navy); font-weight: 500; }
+.ya-defect-rate { width: 60px; text-align: right; color: var(--c-danger); font-weight: 500; }
+
+/* ── Streamlit columns as cards (no wrapping div) ─── */
+div[data-testid="stVerticalBlockBorderWrapper"] {
+  background: var(--c-card);
+  border: 1px solid var(--c-border);
+  border-radius: 14px;
+  padding: 20px 24px;
+  margin-bottom: 4px;
+}
+div[data-testid="stVerticalBlockBorderWrapper"]:hover {
+  box-shadow: 0 4px 16px rgba(10,37,64,0.06);
+}
+
+
+/* Hero card inside container: make sure gradient shows */
+[data-testid="stVerticalBlockBorderWrapper"] .ya-hero {
+  background: linear-gradient(135deg, #0a2540 0%, #1e3a8a 100%) !important;
+  color: white;
+}

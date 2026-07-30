@@ -1,0 +1,98 @@
+# ═══ Python ═══
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# ═══ Virtual environments ═══
+.venv/
+venv/
+env/
+ENV/
+.ENV/
+
+# ═══ IDE ═══
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+*.iml
+*.iws
+*.ipr
+
+# ═══ Testing ═══
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.mypy_cache/
+.ruff_cache/
+*.cover
+
+# ═══ Streamlit ═══
+.streamlit/secrets.toml
+.streamlit/credentials.toml
+
+# ═══ Data files (large) ═══
+data/raw/*.parquet
+data/judged/*.parquet
+data/progress/*
+data/exports/*
+data/uploads/*
+data/archive/*
+data/*.duckdb
+data/*.duckdb.wal
+
+# Keep data dir structure
+!data/raw/.gitkeep
+!data/judged/.gitkeep
+!data/exports/.gitkeep
+!data/uploads/.gitkeep
+!data/archive/.gitkeep
+
+# ═══ Logs ═══
+logs/
+*.log
+
+# ═══ Auth/SSL (sensitive) ═══
+auth_subhandler.pyc
+*.htpasswd
+*.crt
+*.key
+*.pem
+!docs/**/*.pem
+
+# ═══ OS ═══
+Thumbs.db
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+ehthumbs.db
+ehthumbs_vista.db
+.Trashes
+.Trash-*
+.Spotlight-V100
+.fseventsd
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent

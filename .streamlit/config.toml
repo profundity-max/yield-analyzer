@@ -1,0 +1,18 @@
+[server]
+# 增大上传文件限制至 2GB（默认 200MB）
+maxUploadSize = 2048
+
+# 增大请求体大小
+maxMessageSize = 2048
+
+# 无头模式运行
+headless = true
+
+# 关闭使用统计
+[browser]
+gatherUsageStats = false
+
+[theme]
+primaryColor = "#1f77b4"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f0f2f6"
