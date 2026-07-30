@@ -10,6 +10,9 @@ import pandas as pd
 import streamlit as st
 
 from src.config import RAW_DIR
+from src.dashboard.components.cards import (
+    render_kpi, render_hero, render_vendor_row, render_defect_row,
+)
 
 
 # ════════════════════════════════════════════════════════════
@@ -42,44 +45,6 @@ def load_data():
 # ════════════════════════════════════════════════════════════
 # HTML helpers
 # ════════════════════════════════════════════════════════════
-
-
-def _kpi(label: str, value: str, sub: str = "", accent: str = "") -> str:
-    val_class = "ya-stat-value"
-    if accent == "blue":
-        val_class += " ya-stat-accent"
-    if accent == "success":
-        val_class += " ya-stat-success"
-    sub_html = f'<div class="ya-stat-extra">{sub}</div>' if sub else ""
-    return f'<div class="ya-card"><div class="ya-card-label">{label}</div><div class="{val_class}">{value}</div>{sub_html}</div>'
-
-
-def _hero(value: str, delta: str, sub: str) -> str:
-    return f'''<div class="ya-card ya-hero">
-  <div class="ya-card-label">综合良率</div>
-  <div class="ya-hero-value">{value}</div>
-  <span class="ya-hero-delta">↑ {delta}</span>
-  <div class="ya-hero-sub">{sub}</div>
-</div>'''
-
-
-def _vendor_row(name: str, yield_pct: float, css_class: str) -> str:
-    return f'''<div class="ya-vendor-row">
-  <div class="ya-vendor-name">{name}</div>
-  <div class="ya-vendor-bar"><div class="ya-vendor-fill {css_class}" style="width:{yield_pct}%"></div></div>
-  <div class="ya-vendor-yield">{yield_pct:.2f}%</div>
-</div>'''
-
-
-def _defect_row(rank: int, name: str, count: int, rate: float) -> str:
-    bar_width = min(rate * 20, 100)
-    return f'''<div class="ya-defect-row">
-  <div class="ya-defect-rank">{rank}</div>
-  <div class="ya-defect-name">{name}</div>
-  <div class="ya-defect-bar"><div class="ya-defect-fill" style="width:{bar_width}%"></div></div>
-  <div class="ya-defect-count">{count:,}</div>
-  <div class="ya-defect-rate">{rate:.2f}%</div>
-</div>'''
 
 
 # ════════════════════════════════════════════════════════════
@@ -135,19 +100,19 @@ def show():
     with st.container(border=True):
         col_hero, col_s1, col_s2, col_s3, col_s4 = st.columns([4, 2, 2, 2, 2])
         with col_hero:
-            st.markdown(_hero(
+            st.markdown(render_hero(
                 f"{yield_pct:.1f}%",
                 f"+{delta_pp:.1f} pp 预计整形",
                 f"整形前 {rect.get('yield_pct_pre', 0):.2f}% · 整形后 {rect.get('yield_pct_post', 0):.2f}%"
             ), unsafe_allow_html=True)
         with col_s1:
-            st.markdown(_kpi("总产量", f"{total:,}", "SN 总数"), unsafe_allow_html=True)
+            st.markdown(render_kpi("总产量", f"{total:,}", "SN 总数"), unsafe_allow_html=True)
         with col_s2:
-            st.markdown(_kpi("合格数", f"{ok:,}", "OK 判定", accent="success"), unsafe_allow_html=True)
+            st.markdown(render_kpi("合格数", f"{ok:,}", "OK 判定", accent="success"), unsafe_allow_html=True)
         with col_s3:
-            st.markdown(_kpi("不良数", f"{ng:,}", "NG 判定"), unsafe_allow_html=True)
+            st.markdown(render_kpi("不良数", f"{ng:,}", "NG 判定"), unsafe_allow_html=True)
         with col_s4:
-            st.markdown(_kpi("可整形", f"{rect.get('rectifiable_count', 0):,}",
+            st.markdown(render_kpi("可整形", f"{rect.get('rectifiable_count', 0):,}",
                               f"预计挽回 {rect.get('saved_count', 0):,}", accent="blue"),
                         unsafe_allow_html=True)
 
@@ -193,7 +158,7 @@ def show():
             if data["vendor"]:
                 for v in data["vendor"]:
                     css_class = "ly" if v["vendor"] == "LY" else "lk"
-                    st.markdown(_vendor_row(v["vendor"], v["yield_pct"], css_class),
+                    st.markdown(render_vendor_row(v["vendor"], v["yield_pct"], css_class),
                                 unsafe_allow_html=True)
                 st.markdown(f'<div class="ya-stat-extra" style="margin-top:8px">共 {len(data["vendor"])} 个 Vendor</div>',
                             unsafe_allow_html=True)
@@ -209,7 +174,7 @@ def show():
             st.markdown('<div class="ya-card-title">TOP 5 不良 FAI</div>', unsafe_allow_html=True)
             if data["top10"]:
                 for i, d in enumerate(data["top10"][:5], 1):
-                    st.markdown(_defect_row(i, d["fai_name"], d["ng_count"], float(d["ng_rate_pct"])),
+                    st.markdown(render_defect_row(i, d["fai_name"], d["ng_count"], float(d["ng_rate_pct"])),
                                 unsafe_allow_html=True)
 
     with col_rect:
@@ -217,13 +182,13 @@ def show():
             st.markdown('<div class="ya-card-title">预计整形后良率</div>', unsafe_allow_html=True)
             rc1, rc2, rc3 = st.columns(3)
             with rc1:
-                st.markdown(_kpi("原始良率", f"{rect.get('yield_pct_pre', 0):.2f}%"),
+                st.markdown(render_kpi("原始良率", f"{rect.get('yield_pct_pre', 0):.2f}%"),
                             unsafe_allow_html=True)
             with rc2:
-                st.markdown(_kpi("预计提升", f"+{delta_pp:.2f} pp", accent="blue"),
+                st.markdown(render_kpi("预计提升", f"+{delta_pp:.2f} pp", accent="blue"),
                             unsafe_allow_html=True)
             with rc3:
-                st.markdown(_kpi("预计良率", f"{rect.get('yield_pct_post', 0):.2f}%", accent="success"),
+                st.markdown(render_kpi("预计良率", f"{rect.get('yield_pct_post', 0):.2f}%", accent="success"),
                             unsafe_allow_html=True)
             st.markdown(f'<div class="ya-stat-extra" style="margin-top:12px">可整形 SN {rect.get("rectifiable_count", 0):,} 条 · 86% 预计挽回</div>',
                         unsafe_allow_html=True)

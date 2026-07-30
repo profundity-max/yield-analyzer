@@ -59,8 +59,8 @@ def test_data_access_in_memory_isolated(in_memory_db):
     in_memory_db.query("CREATE TABLE isolated (x INT)")
     in_memory_db.query("INSERT INTO isolated VALUES (42)")
     # 另一个 in-memory db 不应看到
-    from src.db import DataAccess
-    other = DataAccess(":memory:")
+    from tests.conftest import _InMemoryDuckDB
+    other = _InMemoryDuckDB()
     result = other.fetchdf(
         "SELECT count(*) AS n FROM duckdb_tables WHERE table_name = \'isolated\'"
     )

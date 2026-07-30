@@ -6,68 +6,16 @@ DuckDB 连接管理模块
 
 import duckdb
 from pathlib import Path
-from src.config import DUCKDB_MEMORY_LIMIT, DUCKDB_THREADS, DUCKDB_TEMP_DIR
 
-from src.config import DATA_DIR
+from src.config import (
+    DATA_DIR, DUCKDB_MEMORY_LIMIT, DUCKDB_THREADS, DUCKDB_TEMP_DIR,
+)
 
-import contextlib
-from typing import Iterator, Optional
-
-
-class DataAccess:
-    """
-    DuckDB 数据访问 adapter（可注入）
-
-    生产场景: DataAccess(path)  → 真实 duckdb 文件
-    测试场景: DataAccess(":memory:")  → 内存库, 不锁文件
-
-    关键设计:
-      - 实例化时建立连接, dispose() 时关闭
-      - 线程不安全 (DuckDB 连接不能跨线程), 但所有调用都在 Streamlit 单线程内
-      - SQL 模板仍由各模块自管, 这里只负责"执行 + 返回"
-    """
-
-    def __init__(self, path: Optional[str] = None, read_only: bool = False):
-        import duckdb as _duckdb
-        if path is None:
-            path = DB_PATH
-        self._conn = _duckdb.connect(path, read_only=read_only) if path != ":memory:" else _duckdb.connect(path)
-        if path != ":memory:":
-            # 生产环境的性能配置
-            self._conn.execute(f"SET memory_limit='{DUCKDB_MEMORY_LIMIT}'")
-            self._conn.execute(f"SET threads={DUCKDB_THREADS}")
-            self._conn.execute(f"SET temp_directory='{DUCKDB_TEMP_DIR}'")
-            self._conn.execute("SET preserve_insertion_order=false")
-
-    def query(self, sql: str, params: dict = None):
-        """执行 SQL, 返回 DuckDB Relation。"""
-        if params:
-            return self._conn.execute(sql, params)
-        return self._conn.execute(sql)
-
-    def fetchdf(self, sql: str, params: dict = None):
-        """执行 SQL, 直接返回 pandas DataFrame。"""
-        if params:
-            return self._conn.execute(sql, params).fetchdf()
-        return self._conn.execute(sql).fetchdf()
-
-    def close(self):
-        if self._conn is not None:
-            self._conn.close()
-            self._conn = None
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args):
-        self.close()
-
-
-
-_connection = None
 
 # DuckDB 持久化文件路径
 DB_PATH = str(DATA_DIR / "yield_analyzer.duckdb")
+
+_connection = None
 
 
 def get_connection(read_only: bool = False) -> duckdb.DuckDBPyConnection:

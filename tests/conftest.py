@@ -16,11 +16,32 @@ def _ensure_data_dirs():
 
 
 
+class _InMemoryDuckDB:
+    """测试用 in-memory DuckDB adapter (无 DataAccess 依赖)。"""
+    def __init__(self):
+        import duckdb
+        self._conn = duckdb.connect(":memory:")
+
+    def query(self, sql, params=None):
+        if params:
+            return self._conn.execute(sql, params)
+        return self._conn.execute(sql)
+
+    def fetchdf(self, sql, params=None):
+        if params:
+            return self._conn.execute(sql, params).fetchdf()
+        return self._conn.execute(sql).fetchdf()
+
+    def close(self):
+        if self._conn is not None:
+            self._conn.close()
+            self._conn = None
+
+
 @pytest.fixture
 def in_memory_db():
     """in-memory DuckDB, 测试用, 不影响生产数据库。"""
-    from src.db import DataAccess
-    da = DataAccess(":memory:")
+    da = _InMemoryDuckDB()
     yield da
     da.close()
 
