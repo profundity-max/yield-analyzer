@@ -13,6 +13,7 @@ from src.config import RAW_DIR
 from src.dashboard.components.cards import (
     render_kpi, render_hero, render_vendor_row, render_defect_row,
 )
+from src.dashboard.components.data_upload import render as render_upload
 
 
 # ════════════════════════════════════════════════════════════
@@ -53,6 +54,8 @@ def load_data():
 
 
 def show():
+    # ── 数据上传 ─────────────────────────────
+    render_upload()
     st.title("📊 汇总看板")
     st.markdown('<div class="subtitle">2026 年 7 月 30 日 · 实时数据</div>', unsafe_allow_html=True)
 

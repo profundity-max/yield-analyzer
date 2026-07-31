@@ -23,6 +23,7 @@ from openpyxl.utils import get_column_letter
 
 from src.config import DAY_CUTOFF_HOUR, EXPORTS_DIR, JUDGED_DIR
 from src.db import get_connection
+from src.aggregator.data_source import get_default_source
 from src.aggregator.queries import (
     DAILY_TOP_DEFECTS_QUERY,
     DAILY_TOP_DEFECTS_REGRESSION_QUERY,
@@ -46,10 +47,6 @@ _CENTER_ALIGN = Alignment(horizontal="center", vertical="center")
 _LEFT_ALIGN = Alignment(horizontal="left", vertical="center")
 
 
-def _parquet_glob() -> str:
-    """获取 judged Parquet 文件 glob"""
-    return str(JUDGED_DIR / "judged_*.parquet")
-
 
 def _get_result_columns() -> list[str]:
     """
@@ -66,10 +63,6 @@ def _get_result_columns() -> list[str]:
     pf.close()
     return cols
 
-
-def _render_sql(template: str, **kwargs) -> str:
-    """渲染 Jinja2 SQL 模板"""
-    return Template(template).render(**kwargs)
 
 
 def _style_header(ws, num_cols: int) -> None:
@@ -236,19 +229,11 @@ def _query_daily_data(
     extra_where = " AND ".join(extra_where_parts) if extra_where_parts else ""
 
     if regression:
-        yield_sql = _render_sql(
-            SN_REGRESSION_QUERY,
-            parquet_glob=_parquet_glob(),
-            cutoff_hour=cutoff_hour,
-            extra_where=extra_where,
-        )
-        defect_sql = _render_sql(
-            DAILY_TOP_DEFECTS_REGRESSION_QUERY,
-            parquet_glob=_parquet_glob(),
-            cutoff_hour=cutoff_hour,
+        yield_sql = get_default_source().read_sql(SN_REGRESSION_QUERY, cutoff_hour=cutoff_hour,
+            extra_where=extra_where,)
+        defect_sql = get_default_source().read_sql(DAILY_TOP_DEFECTS_REGRESSION_QUERY, cutoff_hour=cutoff_hour,
             top_n=9999,
-            extra_where=extra_where,
-        )
+            extra_where=extra_where,)
         daily_yield_rows = [
             {
                 "production_day": str(row[0]),
@@ -263,20 +248,12 @@ def _query_daily_data(
         from src.aggregator.regression import get_daily_rectification_yield
         rectification_rows = get_daily_rectification_yield(cutoff_hour=cutoff_hour)
     else:
-        yield_sql = _render_sql(
-            DAILY_YIELD_QUERY,
-            parquet_glob=_parquet_glob(),
-            cutoff_hour=cutoff_hour,
+        yield_sql = get_default_source().read_sql(DAILY_YIELD_QUERY, cutoff_hour=cutoff_hour,
             cfg_filter=None,
-            extra_where=extra_where,
-        )
-        defect_sql = _render_sql(
-            DAILY_TOP_DEFECTS_QUERY,
-            parquet_glob=_parquet_glob(),
-            cutoff_hour=cutoff_hour,
+            extra_where=extra_where,)
+        defect_sql = get_default_source().read_sql(DAILY_TOP_DEFECTS_QUERY, cutoff_hour=cutoff_hour,
             top_n=9999,
-            extra_where=extra_where,
-        )
+            extra_where=extra_where,)
         daily_yield_rows = [
             {
                 "production_day": str(row[0]),

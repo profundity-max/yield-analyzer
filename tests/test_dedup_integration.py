@@ -14,10 +14,10 @@ def fresh_db(in_memory_db):
 
 def test_dedup_keeps_latest_per_sn(in_memory_db, parquet_dir_with_sample, monkeypatch):
     """同一 SN 多次投产, 只留 Time 最新。"""
-    # 模拟单测环境下 _parquet_glob 返回临时目录
-    def fake_glob():
-        return f"{parquet_dir_with_sample}/*.parquet"
-    monkeypatch.setattr("src.aggregator.regression._parquet_glob", fake_glob)
+    from src.aggregator.data_source import set_default_source, ParquetSource
+    from pathlib import Path
+    # 用临时目录的 ParquetSource 注入, 替换真实数据源
+    set_default_source(ParquetSource(Path(parquet_dir_with_sample)))
 
     # 用 in-memory db 跑查询
     sql = f"""

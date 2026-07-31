@@ -45,10 +45,6 @@ def _is_rectification_fai(fai_name: str) -> bool:
     return False
 
 
-def _parquet_glob() -> str:
-    """获取 judged Parquet 文件 glob"""
-    return str(JUDGED_DIR / "judged_*.parquet")
-
 
 def get_fai_base_names() -> list[tuple[str, str]]:
     """
@@ -58,7 +54,7 @@ def get_fai_base_names() -> list[tuple[str, str]]:
         [(column_name, base_name), ...] 如 [("FAI312_result", "FAI312"), ...]
     """
     conn = get_connection()
-    glob_path = _parquet_glob()
+    glob_path = get_default_source().parquet_glob().strip("'")
     schema = conn.execute(f"""
         SELECT column_name FROM (DESCRIBE SELECT * FROM read_parquet('{glob_path}', union_by_name=true) LIMIT 1)
     """).fetchall()
@@ -83,7 +79,7 @@ def _build_rectification_conditions() -> tuple[str, str, str]:
         - glob_path: parquet 路径
     """
     fai_pairs = get_fai_base_names()  # [(col, base), ...]
-    glob_path = _parquet_glob()
+    glob_path = get_default_source().parquet_glob().strip("'")
 
     if not fai_pairs:
         return "0", "0", glob_path

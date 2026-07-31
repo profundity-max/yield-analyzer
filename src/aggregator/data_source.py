@@ -21,6 +21,7 @@ from typing import Optional
 from jinja2 import Template
 
 from src.config import JUDGED_DIR
+from src.aggregator.schema import YieldSchema
 
 
 # ════════════════════════════════════════════════════════════
@@ -47,10 +48,10 @@ class Filters:
         parts = []
         if self.project:
             safe = self.project.replace("'", "''")
-            parts.append('"Project" = \'' + safe + '\'')
+            parts.append(f'"{YieldSchema.PROJECT}" = \'{safe}\'')
         if self.line:
             safe = self.line.replace("'", "''")
-            parts.append('"Line" = \'' + safe + '\'')
+            parts.append(f'"{YieldSchema.LINE}" = \'{safe}\'')
         return " AND ".join(parts)
 
     def and_sql(self) -> str:

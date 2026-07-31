@@ -5,8 +5,13 @@ SN 回归分析 (Regress to first Time, last measurement)
 - 取最后一次投产数据 (末次测量结果)
 - 回归到第一次投产时间上进行统计 (首次 Time)
 
+模块分工:
+- 本文件: DuckDB SQL 适配 (thin glue)
+- src.aggregator.dedup: 纯去重逻辑 (latest_per_sn, first_per_sn)
+  → 100% 单元测试覆盖, 无 DuckDB 依赖
+
 不在此模块:
-- 整形良率 (rectification) — 已在 src/aggregator/rectification.py
+- 整形良率 (rectification) — 已在 src.aggregator.rectification
 - 原始数据下载 (rawdata) — 仍在 _build_unique_sn_query 等函数中
 """
 
@@ -16,12 +21,9 @@ from jinja2 import Template
 
 from src.config import DAY_CUTOFF_HOUR, JUDGED_DIR
 from src.db import get_connection
+from src.aggregator.data_source import get_default_source
 from src.aggregator.queries import SN_REGRESSION_QUERY, SN_MULTI_PRODUCTION_QUERY
 
-
-def _parquet_glob() -> str:
-    """获取 judged Parquet 文件 glob"""
-    return str(JUDGED_DIR / "judged_*.parquet")
 
 
 def get_regression_daily(
@@ -41,7 +43,7 @@ def get_regression_daily(
         [{production_day, total, ok_count, yield_pct}, ...]
     """
     sql = Template(SN_REGRESSION_QUERY).render(
-        parquet_glob=_parquet_glob(),
+        parquet_glob=get_default_source().parquet_glob().strip("'"),
         cutoff_hour=cutoff_hour,
     )
 
@@ -67,7 +69,7 @@ def get_duplicate_sn_count() -> int:
     sql = f"""
         SELECT COUNT(*) FROM (
             SELECT SN, COUNT(*) as cnt
-            FROM read_parquet('{_parquet_glob()}', union_by_name=true)
+            FROM read_parquet({get_default_source().parquet_glob()}, union_by_name=true)
             GROUP BY SN
             HAVING cnt > 1
         )
@@ -90,19 +92,19 @@ def get_regression_summary() -> dict:
     conn = get_connection()
 
     total_sn = conn.execute(f"""
-        SELECT COUNT(DISTINCT SN) FROM read_parquet('{_parquet_glob()}', union_by_name=true)
+        SELECT COUNT(DISTINCT SN) FROM read_parquet({get_default_source().parquet_glob()}, union_by_name=true)
     """).fetchone()[0]
 
     dup_sn = conn.execute(f"""
         SELECT COUNT(*) FROM (
-            SELECT SN FROM read_parquet('{_parquet_glob()}', union_by_name=true)
+            SELECT SN FROM read_parquet({get_default_source().parquet_glob()}, union_by_name=true)
             GROUP BY SN HAVING COUNT(*) > 1
         )
     """).fetchone()[0]
 
     max_prod = conn.execute(f"""
         SELECT MAX(cnt) FROM (
-            SELECT COUNT(*) as cnt FROM read_parquet('{_parquet_glob()}', union_by_name=true)
+            SELECT COUNT(*) as cnt FROM read_parquet({get_default_source().parquet_glob()}, union_by_name=true)
             GROUP BY SN
         )
     """).fetchone()[0] or 1
@@ -145,7 +147,7 @@ def get_regression_unique_sn_count() -> dict:
                     PARTITION BY SN
                     ORDER BY TRY_CAST("Time" AS TIMESTAMP) DESC
                 ) AS rn
-            FROM read_parquet('{_parquet_glob()}', union_by_name=true)
+            FROM read_parquet({get_default_source().parquet_glob()}, union_by_name=true)
         )
         SELECT
             COUNT(*) AS total_rows,
@@ -205,7 +207,7 @@ def _build_unique_sn_query(
                     ORDER BY TRY_CAST("Time" AS TIMESTAMP) DESC
                 ) AS rn,
                 MIN(TRY_CAST("Time" AS TIMESTAMP)) OVER (PARTITION BY SN) AS first_prod_time
-            FROM read_parquet('{_parquet_glob()}', union_by_name=true)
+            FROM read_parquet({get_default_source().parquet_glob()}, union_by_name=true)
             {extra_where}
         ),
         latest_only AS (

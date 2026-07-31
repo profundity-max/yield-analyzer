@@ -93,6 +93,22 @@ def show():
         )
     with ctrl_row[3]:
         vendor_filter = st.selectbox("Vendor", ['全部', 'LK', 'LY'], key="yt_vendor")
+    with ctrl_row[4]:
+        st.write("")  # spacer
+        st.write("")
+        @st.cache_data(ttl=600, show_spinner="生成下载数据...")
+        def _cached_rawdata_csv():
+            from src.aggregator.regression import get_regression_unique_sn_rawdata
+            df = get_regression_unique_sn_rawdata()
+            return df.to_csv(index=False).encode("utf-8-sig"), len(df)
+        csv_data, n_rows = _cached_rawdata_csv()
+        st.download_button(
+            f"📥 下载回归后Rawdata ({n_rows:,} 行)",
+            csv_data,
+            file_name="regression_rawdata.csv",
+            mime="text/csv",
+            key="yt_quick_dl",
+            help="下载全量回归后唯一SN原始数据")
 
     st.markdown("---")
 
@@ -127,6 +143,9 @@ def show():
                     granularity=granularity,
                     cutoff=cutoff,
                 )
+
+    # ── 回归后 Rawdata 下载面板 ──────────────
+    _render_regression_download_panel()
 
 
 def _render_project_chart(
@@ -364,7 +383,7 @@ def _render_regression_download_panel():
     st.markdown("##### 预览（前 20 行）")
     try:
         df_preview = get_regression_unique_sn_rawdata(
-            line=line_value,
+            cfg=line_value,
             start_date=start_date.isoformat() if start_date else None,
             end_date=end_date.isoformat() if end_date else None,
         )

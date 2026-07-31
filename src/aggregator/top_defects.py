@@ -12,6 +12,7 @@ from jinja2 import Template
 
 from src.config import JUDGED_DIR
 from src.db import get_connection
+from src.aggregator.data_source import get_default_source
 from src.aggregator.queries import (
     TOP_DEFECTS_QUERY_TEMPLATE, SINGLE_FAI_ANALYSIS,
     TOP_DEFECTS_DATE_QUERY, DAILY_TOP_DEFECT_TREND,
@@ -37,10 +38,6 @@ def _get_result_columns(parquet_path: str) -> list[str]:
     return cols
 
 
-def _parquet_glob() -> str:
-    """获取 judged Parquet 文件 glob"""
-    return str(JUDGED_DIR / "judged_*.parquet")
-
 
 def get_top_defects(top_n: int = 20) -> list[dict]:
     """
@@ -63,7 +60,7 @@ def get_top_defects(top_n: int = 20) -> list[dict]:
 
     # 渲染 SQL 模板
     sql = Template(TOP_DEFECTS_QUERY_TEMPLATE).render(
-        parquet_glob=_parquet_glob(),
+        parquet_glob=get_default_source().parquet_glob().strip("'"),
         result_columns=result_columns,
         top_n=top_n,
     )
@@ -105,7 +102,7 @@ def get_top_defects_by_date(
         return []
 
     sql = Template(TOP_DEFECTS_DATE_QUERY).render(
-        parquet_glob=_parquet_glob(),
+        parquet_glob=get_default_source().parquet_glob().strip("'"),
         result_columns=result_columns,
         start_date=start_date,
         end_date=end_date,
@@ -148,7 +145,7 @@ def get_daily_top_trend(
     result_columns = [f"{name}_result" for name in top_fai_names]
 
     sql = Template(DAILY_TOP_DEFECT_TREND).render(
-        parquet_glob=_parquet_glob(),
+        parquet_glob=get_default_source().parquet_glob().strip("'"),
         result_columns=result_columns,
         start_date=start_date,
         end_date=end_date,
@@ -177,7 +174,7 @@ def get_available_date_range() -> tuple[str, str]:
         SELECT
             MIN(CAST(TRY_CAST("Time" AS TIMESTAMP) - INTERVAL '7 hours' AS DATE)),
             MAX(CAST(TRY_CAST("Time" AS TIMESTAMP) - INTERVAL '7 hours' AS DATE))
-        FROM read_parquet('{_parquet_glob()}', union_by_name=true)
+        FROM read_parquet({get_default_source().parquet_glob()}, union_by_name=true)
         WHERE "Time" IS NOT NULL
     """).fetchone()
     return (str(row[0]) if row[0] else "", str(row[1]) if row[1] else "")
@@ -200,7 +197,7 @@ def get_fai_defect_detail(
         [{measured_value, result, SN, Time, Line}, ...]
     """
     sql = Template(SINGLE_FAI_ANALYSIS).render(
-        parquet_glob=_parquet_glob(),
+        parquet_glob=get_default_source().parquet_glob().strip("'"),
         fai_name=fai_name,
         fai_result_col=f"{fai_name}_result",
         top_n=top_n,
@@ -260,7 +257,7 @@ def get_top_defects_regression(
     extra_where = " AND ".join(extra_parts) if extra_parts else ""
 
     sql = Template(DAILY_TOP_DEFECTS_REGRESSION_QUERY).render(
-        parquet_glob=_parquet_glob(),
+        parquet_glob=get_default_source().parquet_glob().strip("'"),
         result_columns=result_columns,
         top_n=top_n,
         cutoff_hour=7,
