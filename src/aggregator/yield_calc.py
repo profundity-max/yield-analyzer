@@ -59,8 +59,7 @@ def _line_yield_mapper(row: tuple) -> dict:
         "line": str(row[0]),
         "total": row[1],
         "ok_count": row[2],
-        "ng_count": row[3],
-        "yield_pct": row[4],
+        "yield_pct": row[3],
     }
 
 
@@ -69,8 +68,7 @@ def _vendor_yield_mapper(row: tuple) -> dict:
         "vendor": str(row[0]),
         "total": row[1],
         "ok_count": row[2],
-        "ng_count": row[3],
-        "yield_pct": row[4],
+        "yield_pct": row[3],
     }
 
 

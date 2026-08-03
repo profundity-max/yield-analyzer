@@ -9,6 +9,8 @@
 输出格式：Excel (.xlsx)，包含「每日良率」和「每日TOP不良」两个 Sheet。
 """
 
+from __future__ import annotations
+
 import io
 import logging
 from datetime import datetime

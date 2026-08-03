@@ -341,19 +341,22 @@ def _render_regression_download_panel():
         st.warning(f"统计信息加载失败: {e}")
 
     with st.expander("🔧 筛选条件（可选）", expanded=True):
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns(4)
         with col1:
             use_date_range = st.checkbox("按日期筛选", value=False,
                                          help="按 Time 字段过滤数据范围")
         with col2:
             use_line_filter = st.checkbox("按 Line 筛选", value=False)
         with col3:
+            use_vendor_filter = st.checkbox("按 Vendor 筛选", value=False,
+                                            help="按 Vendor (LY/LK) 过滤")
+        with col4:
             export_format = st.radio(
                 "导出格式", ["CSV", "Excel (.xlsx)"],
                 horizontal=True, key="reg_export_format"
             )
 
-        start_date = end_date = line_value = None
+        start_date = end_date = line_value = vendor_value = None
 
         if use_date_range:
             try:
@@ -380,10 +383,17 @@ def _render_regression_download_panel():
                 help="输入精确的 Line 名称, 留空表示不过滤"
             ).strip() or None
 
+        if use_vendor_filter:
+            vendor_value = st.selectbox(
+                "Vendor", options=["LY", "LK"],
+                help="选择要筛选的 Vendor"
+            )
+
     st.markdown("##### 预览（前 20 行）")
     try:
         df_preview = get_regression_unique_sn_rawdata(
             cfg=line_value,
+            vendor=vendor_value,
             start_date=start_date.isoformat() if start_date else None,
             end_date=end_date.isoformat() if end_date else None,
         )
@@ -404,8 +414,10 @@ def _render_regression_download_panel():
         parts.append(f"from{start_date.isoformat()}")
     if end_date:
         parts.append(f"to{end_date.isoformat()}")
+    if vendor_value:
+        parts.append(f"Vendor_{vendor_value}")
     if line_value:
-        parts.append(f"line_{line_value}")
+        parts.append(f"Line_{line_value}")
     parts.append(ts)
     base_name = "_".join(parts)
 

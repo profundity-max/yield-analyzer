@@ -57,6 +57,8 @@ def read_data_sheet(
     for i, header in enumerate(header_row):
         if header is not None:
             name = str(header).strip()
+            # 清理列名中的多余空格
+            name = name.replace(" _", "_").replace("_ ", "_")
             # 列名别名标准化: 把 FG号/检测时间 等映射为 SN/Time
             for canonical, aliases in COLUMN_ALIASES.items():
                 if name in aliases:
@@ -125,26 +127,54 @@ def read_spec_sheet(
         if h is not None:
             header_map[str(h).strip()] = i
 
-    # 定位各列（处理可能的列名空格）
-    fai_idx = header_map.get("FAI", 0)
-    usl_idx = header_map.get("USL", 1)
-    nom_idx = header_map.get("Nomial", 2)
-    lsl_idx = header_map.get("LSL", 3)
+    # ── 检测 Spec 格式 ───────────────────────────────
+    # 格式 A: FAI, USL, Nomial, LSL (直接值)
+    # 格式 B: FAI#, Nominal, TOL+, TOL- (需计算 USL/LSL)
+    is_format_b = "FAI#" in header_map or "TOL+" in header_map
+
+    if is_format_b:
+        fai_idx = header_map.get("FAI#", 1)
+        nom_idx = header_map.get("Nominal", 6)
+        tol_plus_idx = header_map.get("TOL+", 7)
+        tol_minus_idx = header_map.get("TOL-", 8)
+        # Format B 没有 USL/LSL 列，需要后续计算
+    else:
+        fai_idx = header_map.get("FAI", 0)
+        usl_idx = header_map.get("USL", 1)
+        nom_idx = header_map.get("Nomial", 2)
+        lsl_idx = header_map.get("LSL", 3)
 
     specs: List[Dict[str, Any]] = []
     for row in ws.iter_rows(min_row=2, values_only=True):
-        if row[fai_idx] is None:
-            continue  # 跳过 FAI 名称为空的行
-
-        fai_name = str(row[fai_idx]).strip()
+        fai_name = str(row[fai_idx]).strip() if row[fai_idx] is not None else ""
         if not fai_name:
             continue
 
+        # 清理 FAI 名称中的多余空格和不规范字符
+        fai_name = fai_name.replace(" _", "_").replace("_ ", "_")
+
+        if is_format_b:
+            nominal = _safe_float(row[nom_idx] if nom_idx < len(row) else None)
+            tol_plus = _safe_float(row[tol_plus_idx] if tol_plus_idx < len(row) else None)
+            tol_minus = _safe_float(row[tol_minus_idx] if tol_minus_idx < len(row) else None)
+            if nominal is not None and tol_plus is not None:
+                usl = nominal + abs(tol_plus)
+            else:
+                usl = None
+            if nominal is not None and tol_minus is not None:
+                lsl = nominal - abs(tol_minus)
+            else:
+                lsl = None
+        else:
+            usl = _safe_float(row[usl_idx] if usl_idx < len(row) else None)
+            nominal = _safe_float(row[nom_idx] if nom_idx < len(row) else None)
+            lsl = _safe_float(row[lsl_idx] if lsl_idx < len(row) else None)
+
         spec: Dict[str, Any] = {
             "fai_name": fai_name,
-            "usl": _safe_float(row[usl_idx] if usl_idx < len(row) else None),
-            "nominal": _safe_float(row[nom_idx] if nom_idx < len(row) else None),
-            "lsl": _safe_float(row[lsl_idx] if lsl_idx < len(row) else None),
+            "usl": usl,
+            "nominal": nominal,
+            "lsl": lsl,
         }
         specs.append(spec)
 

@@ -41,7 +41,7 @@ def render() -> None:
     except Exception:
         min_d, max_d = _date(2026, 1, 1), _date.today()
 
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4, col5 = st.columns(5)
     with col1:
         start_d = st.date_input(
             "起始日期", value=min_d, min_value=min_d, max_value=max_d,
@@ -53,15 +53,21 @@ def render() -> None:
             help="按 Time 字段筛选（含当天）", key="dl_end",
         )
     with col3:
+        vendor_filter = st.selectbox(
+            "Vendor", options=["全部", "LY", "LK"], key="dl_vendor",
+            help="按 Vendor 筛选（全部=不筛选）",
+        )
+    with col4:
         cfg_filter = st.text_input(
-            "Line（可选）", value="", placeholder="例如: LineA",
+            "Line（可选）", value="", placeholder="例如: L1",
             help="留空 = 全部 Line", key="dl_cfg",
         ).strip() or None
-    with col4:
+    with col5:
         full_cols = st.checkbox(
             "全部 FAI 列", value=False, key="dl_full",
-            help="勾选后输出全部 1364 列（含所有 FAI 测量值 + 判定结果），查询变慢约 40 倍",
+            help="勾选后输出全部测量列（排除_result判定列，纯数据）",
         )
+    vendor_param = None if vendor_filter == "全部" else vendor_filter
 
     # ── 2. 查询按钮（仅在点击时执行） ────────────────
     if st.button(
@@ -71,6 +77,7 @@ def render() -> None:
         with st.spinner("查询中..."):
             df_raw = get_regression_unique_sn_fast(
                 cfg=cfg_filter,
+                vendor=vendor_param,
                 start_date=start_d.isoformat(),
                 end_date=end_d.isoformat(),
                 full_columns=full_cols,
@@ -96,8 +103,10 @@ def render() -> None:
                 from datetime import datetime
                 ts = datetime.now().strftime("%Y%m%d_%H%M%S")
                 parts = ["unique_sn_rawdata", f"{start_d.isoformat()}_to_{end_d.isoformat()}"]
+                if vendor_param:
+                    parts.append(f"Vendor_{vendor_param}")
                 if cfg_filter:
-                    parts.append(f"cfg_{cfg_filter}")
+                    parts.append(f"Line_{cfg_filter}")
                 if full_cols:
                     parts.append("full")
                 parts.append(ts)

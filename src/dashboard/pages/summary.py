@@ -203,27 +203,48 @@ def show():
         st.markdown('<div class="ya-card-title">📥 报表下载</div>', unsafe_allow_html=True)
 
         from src.aggregator.exporter import get_report_bytes_pre, get_report_bytes_post
-        from src.aggregator.regression import get_daily_rectification_yield
+        from src.aggregator.rectification import get_daily_rectification_yield
         from src.aggregator.top_defects import get_top_defects_regression
 
+        # ── 筛选器 ──
+        filter_col1, filter_col2 = st.columns(2)
+        with filter_col1:
+            sel_vendor = st.selectbox("Vendor", options=["全部", "LY", "LK"], key="export_vendor",
+                                      help="按 Vendor 筛选导出数据（全部=不筛选）")
+        with filter_col2:
+            sel_line = st.selectbox("Line", options=["全部", "L1"], key="export_line",
+                                    help="按 Line 筛选导出数据（全部=不筛选）")
+
+        vendor_param = None if sel_vendor == "全部" else sel_vendor
+        line_param = None if sel_line == "全部" else sel_line
+
+        # 筛选标签
+        filter_parts = []
+        if vendor_param: filter_parts.append(f"Vendor={vendor_param}")
+        if line_param: filter_parts.append(f"Line={line_param}")
+        filter_label = "_" + "_".join(filter_parts) if filter_parts else ""
+        filter_desc = " · ".join(filter_parts) if filter_parts else "全部数据"
+
+        st.caption(f"📌 当前筛选: **{filter_desc}**")
+
         @st.cache_data(ttl=300, show_spinner="生成回归前日报...")
-        def _cached_pre() -> bytes:
-            return get_report_bytes_pre(top_n=10)
+        def _cached_pre(sel_vendor, sel_line) -> bytes:
+            return get_report_bytes_pre(top_n=10, project=sel_vendor, line=sel_line)
 
         @st.cache_data(ttl=300, show_spinner="生成回归后日报...")
-        def _cached_post() -> bytes:
-            return get_report_bytes_post(top_n=10)
+        def _cached_post(sel_vendor, sel_line) -> bytes:
+            return get_report_bytes_post(top_n=10, project=sel_vendor, line=sel_line)
 
         @st.cache_data(ttl=300, show_spinner="生成每日不良率...")
-        def _cached_daily_csv() -> bytes:
-            rows = get_daily_rectification_yield()
+        def _cached_daily_csv(sel_vendor, sel_line) -> bytes:
+            rows = get_daily_rectification_yield(project=sel_vendor, line=sel_line)
             if not rows:
                 return b""
             return pd.DataFrame(rows).to_csv(index=False).encode("utf-8-sig")
 
         @st.cache_data(ttl=300, show_spinner="生成 TOP 不良...")
-        def _cached_top_csv() -> bytes:
-            rows = get_top_defects_regression(top_n=20)
+        def _cached_top_csv(sel_vendor, sel_line) -> bytes:
+            rows = get_top_defects_regression(top_n=20, project=sel_vendor, line=sel_line)
             if not rows:
                 return b""
             return pd.DataFrame(rows).to_csv(index=False).encode("utf-8-sig")
@@ -234,16 +255,18 @@ def show():
             sc1, sc2 = st.columns(2)
             with sc1:
                 try:
-                    st.download_button("📥 回归前日报", _cached_pre(),
-                                       file_name=f"daily_pre_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                    pre_data = _cached_pre(vendor_param, line_param)
+                    pre_fname = f"daily_pre{filter_label}_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+                    st.download_button("📥 回归前日报", pre_data, file_name=pre_fname,
                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                        use_container_width=True)
                 except Exception as e:
                     st.error(f"生成失败: {e}")
             with sc2:
                 try:
-                    st.download_button("📥 回归后日报 (含整形)", _cached_post(),
-                                       file_name=f"daily_post_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                    post_data = _cached_post(vendor_param, line_param)
+                    post_fname = f"daily_post{filter_label}_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+                    st.download_button("📥 回归后日报 (含整形)", post_data, file_name=post_fname,
                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                        use_container_width=True)
                 except Exception as e:
@@ -253,10 +276,10 @@ def show():
             sc3, sc4 = st.columns(2)
             with sc3:
                 try:
-                    csv1 = _cached_daily_csv()
+                    csv1 = _cached_daily_csv(vendor_param, line_param)
                     if csv1:
-                        st.download_button("📥 每日回归后不良率", csv1,
-                                           file_name=f"daily_defect_{datetime.now().strftime('%Y%m%d')}.csv",
+                        csv1_fname = f"daily_defect{filter_label}_{datetime.now().strftime('%Y%m%d')}.csv"
+                        st.download_button("📥 每日回归后不良率", csv1, file_name=csv1_fname,
                                            mime="text/csv", use_container_width=True)
                     else:
                         st.info("无数据")
@@ -264,10 +287,10 @@ def show():
                     st.error(f"生成失败: {e}")
             with sc4:
                 try:
-                    csv2 = _cached_top_csv()
+                    csv2 = _cached_top_csv(vendor_param, line_param)
                     if csv2:
-                        st.download_button("📥 TOP 不良 FAI", csv2,
-                                           file_name=f"top_defects_{datetime.now().strftime('%Y%m%d')}.csv",
+                        csv2_fname = f"top_defects{filter_label}_{datetime.now().strftime('%Y%m%d')}.csv"
+                        st.download_button("📥 TOP 不良 FAI", csv2, file_name=csv2_fname,
                                            mime="text/csv", use_container_width=True)
                     else:
                         st.info("无数据")

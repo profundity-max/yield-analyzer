@@ -170,19 +170,24 @@ def _build_unique_sn_query(
     cfg: Optional[str] = None,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
+    vendor: Optional[str] = None,
 ) -> str:
     """
     构造回归去重后的唯一 SN 查询 SQL。
 
     Args:
-        columns: "core" = 7 个关键列（轻量, 0.1s）; "all" = 全列（1364列, ~4s）
+        columns: "core" = 7 个关键列（轻量）; "all" = 全列（排除_result列，纯测量值）
         cfg: 可选的 Line 精确筛选
         start_date, end_date: 日期范围筛选 (YYYY-MM-DD, end_date 含当天)
+        vendor: 可选的 Vendor 精确筛选
     """
     where_clauses = []
     if cfg:
         safe_cfg = cfg.replace("'", "''")
         where_clauses.append(f'\"Line\" = \'{safe_cfg}\'')
+    if vendor:
+        safe_v = vendor.replace("'", "''")
+        where_clauses.append(f'\"Vendor\" = \'{safe_v}\'')
     if start_date:
         safe_start = start_date.replace("'", "''")
         where_clauses.append(f'TRY_CAST("Time" AS TIMESTAMP) >= \'{safe_start}\'')
@@ -224,6 +229,7 @@ def get_regression_unique_sn(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     columns: str = "core",
+    vendor: Optional[str] = None,
 ) -> "pd.DataFrame":
     """
     获取回归后唯一 SN 的数据（统一入口）。
@@ -231,17 +237,27 @@ def get_regression_unique_sn(
     Args:
         cfg: 可选的 Line 精确筛选。
         start_date, end_date: 日期范围 (YYYY-MM-DD)。
-        columns: "core" = 7 列轻量, "all" = 全列。
+        columns: "core" = 关键列轻量, "all" = 全列（排除_result）。
+        vendor: 可选的 Vendor 精确筛选。
 
     Returns:
         pd.DataFrame
     """
     import pandas as pd
 
-    sql = _build_unique_sn_query(columns, cfg, start_date, end_date)
+    sql = _build_unique_sn_query(columns, cfg, start_date, end_date, vendor=vendor)
     df = get_connection().execute(sql).fetchdf()
     if "Time" in df.columns:
         df["Time"] = pd.to_datetime(df["Time"], errors="coerce")
+
+    # full_columns 模式下排除判定列（保留纯测量数据，不含判定信息）
+    if columns == "all":
+        drop_cols = [c for c in df.columns if c.endswith("_result")]
+        if "overall_result" in df.columns:
+            drop_cols.append("overall_result")
+        if drop_cols:
+            df = df.drop(columns=drop_cols)
+
     return df
 
 
@@ -255,6 +271,7 @@ def get_regression_unique_sn_fast(
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     full_columns: bool = False,
+    vendor: Optional[str] = None,
 ) -> "pd.DataFrame":
     """向后兼容：旧 fast 接口，转发到 get_regression_unique_sn。"""
     return get_regression_unique_sn(
@@ -262,6 +279,7 @@ def get_regression_unique_sn_fast(
         start_date=start_date,
         end_date=end_date,
         columns="all" if full_columns else "core",
+        vendor=vendor,
     )
 
 
@@ -269,10 +287,11 @@ def get_regression_unique_sn_rawdata(
     cfg: Optional[str] = None,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
+    vendor: Optional[str] = None,
 ) -> "pd.DataFrame":
     """向后兼容：旧 rawdata 接口 = 全部列。"""
     return get_regression_unique_sn(
-        cfg=cfg, start_date=start_date, end_date=end_date, columns="all"
+        cfg=cfg, start_date=start_date, end_date=end_date, columns="all", vendor=vendor,
     )
 
 

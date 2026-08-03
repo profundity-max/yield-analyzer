@@ -18,6 +18,7 @@ import re
 from typing import Optional
 
 from src.config import DAY_CUTOFF_HOUR, JUDGED_DIR
+from src.aggregator.data_source import get_default_source
 from src.db import get_connection
 
 

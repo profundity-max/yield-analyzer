@@ -49,9 +49,14 @@ def show():
     min_date = datetime.strptime(date_range[0], "%Y-%m-%d") if date_range[0] else datetime(2026, 6, 28)
     max_date = datetime.strptime(date_range[1], "%Y-%m-%d") if date_range[1] else datetime.today()
 
+    # 确保默认起始日期不早于数据最早日期
+    default_start = max_date - timedelta(days=7)
+    if default_start < min_date:
+        default_start = min_date
+
     filter_col1, filter_col2, filter_col3 = st.columns(3)
     with filter_col1:
-        start_date = st.date_input("开始日期", value=max_date - timedelta(days=7),
+        start_date = st.date_input("开始日期", value=default_start,
                                     min_value=min_date, max_value=max_date)
     with filter_col2:
         end_date = st.date_input("结束日期", value=max_date,
