@@ -52,3 +52,7 @@ Excel/CSV → importer (raw parquet)
 - FAI344, FAI346, FAI347, FAI348
 
 匹配规则: 列名需与白名单相同（基础名），允许带 `_T`/`_Z` 等后缀变体。
+----- 新增同事账号就绪 -----
+2026-08-03 11:18:55
+tmnb123:$apr1$zlnSUPXZ$xec5QYxNBqcONXXxYu0FD.
+collab:$apr1$HgqjLxOB$xYgS8tWbSZHCVjpqmVQQ01
