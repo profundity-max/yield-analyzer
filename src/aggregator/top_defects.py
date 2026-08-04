@@ -23,17 +23,24 @@ def _get_result_columns(parquet_path: str) -> list[str]:
     """
     获取 Parquet 中所有 result 列名
 
+    只保留数值型 (TINYINT/SMALLINT/INT/BIGINT/FLOAT/DOUBLE) 的 _result 列,
+    过滤掉意外写入的字符串型 result 列 (如历史脏数据 '初始规格导入' 等).
+
     Args:
         parquet_path: judged Parquet 文件路径
 
     Returns:
-        以 _result 结尾的列名列表
+        以 _result 结尾且类型为数值型的列名列表
     """
     pf = pq.ParquetFile(parquet_path)
-    cols = [
-        field.name for field in pf.schema_arrow
-        if field.name.endswith("_result") and field.name != "overall_result"
-    ]
+    cols = []
+    for field in pf.schema_arrow:
+        if not field.name.endswith("_result") or field.name == "overall_result":
+            continue
+        type_str = str(field.type).upper()
+        # 只保留数值型 (排除 VARCHAR / STRING / BINARY)
+        if any(t in type_str for t in ("INT", "FLOAT", "DOUBLE", "DECIMAL", "REAL", "HUGEINT", "UBIGINT", "UINTEGER", "USMALLINT", "TINYINT")):
+            cols.append(field.name)
     pf.close()
     return cols
 

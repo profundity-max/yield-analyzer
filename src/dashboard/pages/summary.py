@@ -16,13 +16,36 @@ from src.dashboard.components.cards import (
 from src.dashboard.components.data_upload import render as render_upload
 
 
+def _safe_float(value, default: float = 0.0) -> float:
+    """容错地把任意值转为 float; 失败回退 default。
+
+    Streamlit 缓存中如果存了脏数据, 这里不会抛 ValueError。
+    """
+    if isinstance(value, (int, float)):
+        return float(value)
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
 # ════════════════════════════════════════════════════════════
 # 数据加载
 # ════════════════════════════════════════════════════════════
 
 
 @st.cache_data(ttl=300)
-def load_data():
+def load_data(_cache_version: str = "v4"):
+    """
+    加载所有汇总数据 (缓存5分钟)。
+
+    Args:
+        _cache_version: 内部 cache buster。修改这个值会强制 cache miss,
+                        用于代码或数据 schema 变更后清除旧脏数据。
+                        下划线前缀避免 Streamlit 把它当 widget 绑定。
+    """
     from src.aggregator.yield_calc import (
         get_summary, get_daily_yield, get_cfg_yield, get_vendor_yield,
     )
@@ -31,13 +54,33 @@ def load_data():
         get_regression_summary, get_regression_daily, get_rectification_stats,
     )
 
+    top = get_top_defects(top_n=10)
+
+    # 防御: 过滤 ng_rate_pct 不能转为 float 的脏条目, 以及 fai_name 是元数据文字的条目
+    clean_top = []
+    for d in top:
+        name = d.get("fai_name")
+        rate = d.get("ng_rate_pct")
+        try:
+            rate_f = float(rate)
+        except (TypeError, ValueError):
+            continue
+        if not isinstance(name, str) or not name or name in ("初始规格导入",):
+            continue
+        clean_top.append({
+            "fai_name": name,
+            "ng_count": d.get("ng_count", 0),
+            "total": d.get("total", 0),
+            "ng_rate_pct": rate_f,
+        })
+
     return {
         "summary": get_summary(),
         "daily": get_daily_yield(),
         "daily_regression": get_regression_daily(),
         "cfg": get_cfg_yield(),
         "vendor": get_vendor_yield(),
-        "top10": get_top_defects(top_n=10),
+        "top10": clean_top,
         "regression": get_regression_summary(),
         "rectification": get_rectification_stats(),
     }
@@ -62,7 +105,7 @@ def show():
     # ── 数据加载 ─────────────────────────────
     try:
         with st.spinner("加载数据中..."):
-            data = load_data()
+            data = load_data(_cache_version="v4")
     except Exception as e:
         st.error(f"数据加载失败: {e}")
         st.info("💡 请先上传数据文件")
@@ -177,7 +220,10 @@ def show():
             st.markdown('<div class="ya-card-title">TOP 5 不良 FAI</div>', unsafe_allow_html=True)
             if data["top10"]:
                 for i, d in enumerate(data["top10"][:5], 1):
-                    st.markdown(render_defect_row(i, d["fai_name"], d["ng_count"], float(d["ng_rate_pct"])),
+                    rate = _safe_float(d.get("ng_rate_pct"))
+                    count = _safe_float(d.get("ng_count"), 0)
+                    name = d.get("fai_name") or "?"
+                    st.markdown(render_defect_row(i, name, int(count), rate),
                                 unsafe_allow_html=True)
 
     with col_rect:

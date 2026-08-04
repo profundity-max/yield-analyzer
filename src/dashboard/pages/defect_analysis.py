@@ -19,25 +19,59 @@ from src.aggregator.yield_calc import list_projects
 from src.config import DAY_CUTOFF_HOUR
 
 
+def _safe_float(value, default: float = 0.0) -> float:
+    """容错 float 转换 (与 summary.py 同样的防护)。"""
+    if isinstance(value, (int, float)):
+        return float(value)
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _clean_top_rows(rows: list[dict]) -> list[dict]:
+    """过滤脏 top_defects 条目 (ng_rate_pct 不能转 float 或 fai_name 异常)。"""
+    clean = []
+    for r in rows or []:
+        name = r.get("fai_name")
+        if not isinstance(name, str) or not name:
+            continue
+        try:
+            rate_f = float(r.get("ng_rate_pct"))
+            ng_int = int(r.get("ng_count", 0))
+            total_int = int(r.get("total", 0))
+        except (TypeError, ValueError):
+            continue
+        clean.append({
+            "fai_name": name,
+            "ng_count": ng_int,
+            "total": total_int,
+            "ng_rate_pct": rate_f,
+        })
+    return clean
+
+
 @st.cache_data(ttl=300)
-def load_date_range():
+def load_date_range(_cache_version: str = "v4"):
     return get_available_date_range()
 
 
 @st.cache_data(ttl=300)
-def load_overall_defects(top_n: int = 50, regression: bool = False):
+def load_overall_defects(top_n: int = 50, regression: bool = False, _cache_version: str = "v4"):
     if regression:
-        return get_top_defects_regression(top_n=top_n)
-    return get_top_defects(top_n=top_n)
+        return _clean_top_rows(get_top_defects_regression(top_n=top_n))
+    return _clean_top_rows(get_top_defects(top_n=top_n))
 
 
 @st.cache_data(ttl=300)
-def load_date_defects(start: str, end: str, top_n: int, regression: bool = False):
-    return get_top_defects_by_date(start, end, top_n=top_n)
+def load_date_defects(start: str, end: str, top_n: int, regression: bool = False, _cache_version: str = "v4"):
+    return _clean_top_rows(get_top_defects_by_date(start, end, top_n=top_n))
 
 
 @st.cache_data(ttl=300)
-def load_daily_trend(fai_names: list[str], start: str, end: str):
+def load_daily_trend(fai_names: list[str], start: str, end: str, _cache_version: str = "v4"):
     return get_daily_top_trend(fai_names, start, end)
 
 
@@ -45,9 +79,15 @@ def show():
     st.title("🔴 不良分析")
 
     # ── 筛选器行 ────────────────────────────────────
-    date_range = load_date_range()
-    min_date = datetime.strptime(date_range[0], "%Y-%m-%d") if date_range[0] else datetime(2026, 6, 28)
-    max_date = datetime.strptime(date_range[1], "%Y-%m-%d") if date_range[1] else datetime.today()
+    try:
+        date_range = load_date_range(_cache_version="v4")
+        min_date = datetime.strptime(date_range[0], "%Y-%m-%d") if date_range[0] else datetime(2026, 6, 28)
+        max_date = datetime.strptime(date_range[1], "%Y-%m-%d") if date_range[1] else datetime.today()
+    except (ValueError, TypeError):
+        # 旧缓存或异常数据: 退回默认范围
+        min_date = datetime(2026, 6, 28)
+        max_date = datetime.today()
+        date_range = (min_date.strftime("%Y-%m-%d"), max_date.strftime("%Y-%m-%d"))
 
     # 确保默认起始日期不早于数据最早日期
     default_start = max_date - timedelta(days=7)
@@ -81,8 +121,8 @@ def show():
 
     # ── 加载数据 ────────────────────────────────────
     with st.spinner("分析不良数据中..."):
-        all_defects = load_overall_defects(top_n=50, regression=regression_mode)
-        date_defects = load_date_defects(start_str, end_str, top_n=50, regression=regression_mode)
+        all_defects = load_overall_defects(top_n=50, regression=regression_mode, _cache_version="v4")
+        date_defects = load_date_defects(start_str, end_str, top_n=50, regression=regression_mode, _cache_version="v4")
 
     if not date_defects:
         st.info("所选日期范围内未检测到不良数据")
@@ -124,7 +164,7 @@ def show():
     # ── 逐日趋势 ────────────────────────────────────
     st.subheader("📈 TOP 不良逐日趋势")
     top5_names = [d['fai_name'] for d in date_defects[:5]]
-    trend_data = load_daily_trend(top5_names, start_str, end_str)
+    trend_data = load_daily_trend(top5_names, start_str, end_str, _cache_version="v4")
 
     if trend_data:
         fig = go.Figure()
