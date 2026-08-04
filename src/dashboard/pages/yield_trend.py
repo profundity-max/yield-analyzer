@@ -74,7 +74,7 @@ def show():
     st.title("📈 良率趋势分析")
 
     # ── 顶部控制条 (ADR-0003: 显示模式 toggle) ──────
-    ctrl_row = st.columns([1, 1, 1, 1, 1, 1])
+    ctrl_row = st.columns([1, 1, 1, 1, 1])
     with ctrl_row[0]:
         display_mode = st.radio(
             "显示模式",
@@ -93,23 +93,6 @@ def show():
         )
     with ctrl_row[3]:
         vendor_filter = st.selectbox("Vendor", ['全部', 'LK', 'LY'], key="yt_vendor")
-    with ctrl_row[4]:
-        st.write("")  # spacer
-        st.write("")
-        @st.cache_data(ttl=600, show_spinner="生成下载数据...")
-        def _cached_rawdata_csv():
-            from src.aggregator.regression import get_regression_unique_sn_rawdata
-            df = get_regression_unique_sn_rawdata()
-            return df.to_csv(index=False).encode("utf-8-sig"), len(df)
-        csv_data, n_rows = _cached_rawdata_csv()
-        st.download_button(
-            f"📥 下载回归后Rawdata ({n_rows:,} 行)",
-            csv_data,
-            file_name="regression_rawdata.csv",
-            mime="text/csv",
-            key="yt_quick_dl",
-            help="下载全量回归后唯一SN原始数据")
-
     st.markdown("---")
 
     # ── Project Tabs (ADR-0002) ──────────────────────
