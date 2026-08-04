@@ -19,6 +19,7 @@ from src.importer.excel_reader import (
     read_spec_sheet,
 )
 from src.importer.parquet_writer import generate_batch_id, write_to_parquet
+from src.importer.data_cleaner import REQUIRED_METADATA, clean_file
 
 
 def render() -> None:
@@ -100,21 +101,31 @@ def _detect_data_sheet(filepath: str) -> str:
     )
 
 
-def _validate_required_columns(columns: list[str], row_gen):
-    """验证 Vendor / Project / Line 三个必填列存在。
+def _is_missing(value) -> bool:
+    """判定单元格是否为空 (None / 空串 / "None")。"""
+    if value is None:
+        return True
+    s = str(value).strip()
+    return (not s) or (s.lower() == "none")
 
-    返回 (vendor_ok, project_ok, line_ok, vendor_default, project_default, line_default)
-    如果某列有非空数据 → ok=True, default=None
-    如果某列全空 → ok=False, default=推断的默认值（从 Line 或文件名推断）
 
-    Raises:
-        ValueError: 缺少必填列时抛出。
+def _count_metadata_invalid(columns: list[str], row_gen) -> dict:
+    """扫描全量数据, 统计每列缺失行数与总缺失行数。
+
+    Returns:
+        {
+            "vendor_ok": bool, "project_ok": bool, "line_ok": bool,
+            "line_value": Optional[str],
+            "per_column_invalid": {"Vendor": n, "Project": n, "Line": n},
+            "total_invalid": int,
+            "scanned_rows": int,
+        }
     """
-    required = {"Vendor", "Project", "Line"}
+    required = list(REQUIRED_METADATA)
     col_set = set(columns)
 
-    # 1. 列存在性检查
-    missing = required - col_set
+    # 列存在性检查
+    missing = set(required) - col_set
     if missing:
         raise ValueError(
             f"❌ Data Sheet 缺少必填列: {', '.join(sorted(missing))}。"
@@ -126,24 +137,40 @@ def _validate_required_columns(columns: list[str], row_gen):
     project_idx = columns.index("Project")
     line_idx = columns.index("Line")
 
-    vendor_ok = project_ok = line_ok = False
+    vendor_invalid = project_invalid = line_invalid = 0
     line_value = None
+    scanned = 0
 
-    for row_num, row in enumerate(row_gen, 1):
-        if not vendor_ok and row[vendor_idx] is not None and str(row[vendor_idx]).strip() not in ("", "None"):
-            vendor_ok = True
-        if not project_ok and row[project_idx] is not None and str(row[project_idx]).strip() not in ("", "None"):
-            project_ok = True
-        if not line_ok and row[line_idx] is not None and str(row[line_idx]).strip() not in ("", "None"):
-            line_ok = True
+    for row in row_gen:
+        scanned += 1
+        if _is_missing(row[vendor_idx]):
+            vendor_invalid += 1
+        if _is_missing(row[project_idx]):
+            project_invalid += 1
+        if _is_missing(row[line_idx]):
+            line_invalid += 1
+        elif line_value is None:
             line_value = str(row[line_idx]).strip()
 
-        if vendor_ok and project_ok and line_ok:
-            break
-        if row_num >= 5000:
-            break
+    return {
+        "vendor_ok": vendor_invalid < scanned,
+        "project_ok": project_invalid < scanned,
+        "line_ok": line_invalid < scanned,
+        "line_value": line_value,
+        "per_column_invalid": {
+            "Vendor": vendor_invalid,
+            "Project": project_invalid,
+            "Line": line_invalid,
+        },
+        "total_invalid": max(vendor_invalid, project_invalid, line_invalid),  # 至少一个为空
+        "scanned_rows": scanned,
+    }
 
-    return vendor_ok, project_ok, line_ok, line_value
+
+def _validate_required_columns(columns: list[str], row_gen):
+    """(向后兼容) 旧接口, 返回 (vendor_ok, project_ok, line_ok, line_value)。"""
+    info = _count_metadata_invalid(columns, row_gen)
+    return info["vendor_ok"], info["project_ok"], info["line_ok"], info["line_value"]
 
 
 def _remove_null_rows(parquet_path: str) -> tuple[int, int]:
@@ -259,17 +286,35 @@ def _run_import_pipeline(uploaded_file) -> None:
         columns, row_gen, total_cols = read_data_sheet(str(tmp_path), sheet_name=data_sheet)
         st.caption(f"✓ 共 {len(columns)} 列（原始 {total_cols} 列）")
 
-        # ── 必填字段验证 ──────────────────────────
+        # ── 必填字段验证（全量扫描） ─────────────────
         progress_bar.progress(25, "验证必填字段...")
-        status_text.info("🔍 正在验证 Vendor / Project / Line 完整性...")
-        vend_ok, proj_ok, line_ok, line_val = _validate_required_columns(columns, row_gen)
+        status_text.info("🔍 正在全量扫描 Vendor / Project / Line 完整性...")
+        meta_info = _count_metadata_invalid(columns, row_gen)
+        vend_ok = meta_info["vendor_ok"]
+        proj_ok = meta_info["project_ok"]
+        line_ok = meta_info["line_ok"]
+        line_val = meta_info["line_value"]
+        scanned = meta_info["scanned_rows"]
+        per_col = meta_info["per_column_invalid"]
+        total_invalid = meta_info["total_invalid"]
 
-        fill_vendor = None; fill_project = None
-        need_fill = False
-        if not vend_ok or not proj_ok:
-            need_fill = True
-            st.warning("⚠️ 数据中 Vendor 或 Project 字段为空，请补填以下信息：")
-            fc1, fc2 = st.columns(2)
+        # 展示扫描结果
+        cols_show = st.columns(3)
+        for c, name in zip(cols_show, REQUIRED_METADATA):
+            with c:
+                miss = per_col[name]
+                if miss == 0:
+                    c.markdown(f"✅ **<span style='color:green'>{name}</span>** 全部完整 ({scanned:,} 行)**", unsafe_allow_html=True)
+                elif miss == scanned:
+                    c.markdown(f"❌ **{name}** 全部为空 ({miss:,}/{scanned:,})**", unsafe_allow_html=True)
+                else:
+                    c.markdown(f"⚠️ **{name}** 部分缺失 ({miss:,}/{scanned:,}, {miss / max(scanned, 1) * 100:.1f}%)**", unsafe_allow_html=True)
+
+        fill_vendor = None; fill_project = None; fill_line = None
+        if not vend_ok or not proj_ok or not line_ok:
+            # 有全空列, 必须让用户手动补全才能继续
+            st.warning("⚠️ 数据中 Vendor / Project / Line 有整列缺失，必须手动补全后才能继续：")
+            fc1, fc2, fc3 = st.columns(3)
             with fc1:
                 if not vend_ok:
                     fill_vendor = st.text_input("Vendor（必填）", value="LY",
@@ -278,17 +323,34 @@ def _run_import_pipeline(uploaded_file) -> None:
                     st.caption("✓ Vendor 已从数据读取")
             with fc2:
                 if not proj_ok:
-                    # 尝试从 Line 值推断 Project
                     default_proj = "967E1" if line_val and "L1" in str(line_val).upper() else ""
                     fill_project = st.text_input("Project（必填）", value=default_proj,
                                                  help="所有行的 Project 将设为此值")
                 else:
                     st.caption("✓ Project 已从数据读取")
+            with fc3:
+                if not line_ok:
+                    default_line = line_val or "L1"
+                    fill_line = st.text_input("Line（必填）", value=default_line,
+                                              help="所有行的 Line 将设为此值")
+                else:
+                    st.caption("✓ Line 已从数据读取")
 
             if not st.button("✅ 确认并继续", type="primary"):
                 st.stop()  # 等待用户填写
 
-        st.caption("✓ Vendor / Project / Line 字段验证通过")
+            # 校验用户输入
+            for name, val in (("Vendor", fill_vendor), ("Project", fill_project), ("Line", fill_line)):
+                if val is not None and (not val.strip() or val.strip().lower() == "none"):
+                    raise ValueError(f"❌ {name} 不能为空字符串或 'None'。")
+
+        # 警告：部分缺失行 (但不阻止上传, 稍后自动剔除)
+        if total_invalid > 0 and vend_ok and proj_ok and line_ok:
+            st.warning(
+                f"⚠️ 检测到 {total_invalid:,} / {scanned:,} 行 "
+                f"({total_invalid / max(scanned, 1) * 100:.2f}%) 缺少 Vendor / Project / Line，"
+                f"导入后将自动剔除这些脏数据。"
+            )
 
         # ── Step 4: 检测 FAI 列 ───────────────────────
         progress_bar.progress(45, "匹配 FAI 列...")
@@ -317,7 +379,8 @@ def _run_import_pipeline(uploaded_file) -> None:
             pct = min(40 + int(50 * rows_written / max(rows_written, 50000)), 90)
             progress_bar.progress(pct, f"写入 {rows_written:,} 行...")
 
-        # 包装生成器：统计行数 + 填充缺失的 Vendor/Project
+        # 包装生成器：统计行数 + 填充缺失的 Vendor/Project/Line
+        line_idx = columns.index("Line") if "Line" in columns else -1
         def counting_gen():
             count = 0
             for row in row_gen:
@@ -326,6 +389,8 @@ def _run_import_pipeline(uploaded_file) -> None:
                     row_list[vendor_idx] = fill_vendor
                 if fill_project and project_idx >= 0 and (row_list[project_idx] is None or str(row_list[project_idx]).strip() in ("", "None")):
                     row_list[project_idx] = fill_project
+                if fill_line and line_idx >= 0 and (row_list[line_idx] is None or str(row_list[line_idx]).strip() in ("", "None")):
+                    row_list[line_idx] = fill_line
                 count += 1
                 yield row_list
             row_count[0] = count
@@ -342,12 +407,27 @@ def _run_import_pipeline(uploaded_file) -> None:
             f"✅ Parquet 写入完成: {total_rows:,} 行, {len(columns)} 列, {file_size_mb:.1f} MB"
         )
 
-        # ── Step 4.5: 清理空行 + 去重 ──────────────────
+        # ── Step 4.5: 清理空行 + 元数据清洗 + 去重 ────────
         progress_bar.progress(80, "清理无效数据...")
         status_text.info("🧹 正在清理空行...")
         null_before, null_removed = _remove_null_rows(str(output_path))
         if null_removed > 0:
             st.caption(f"✓ 移除 {null_removed:,} 行完全空数据")
+
+        # ── 元数据清洗：剔除缺失 Vendor/Project/Line 的行 ─────
+        progress_bar.progress(82, "剔除脏数据...")
+        status_text.info("🧹 正在剔除缺失 Vendor/Project/Line 的脏数据...")
+        clean_result = clean_file(str(output_path))
+        meta_removed = clean_result["removed"]
+        if meta_removed > 0:
+            pct = meta_removed / max(clean_result["total_rows"], 1) * 100
+            st.caption(
+                f"✓ 剔除 {meta_removed:,} 行缺失 Vendor/Project/Line 的脏数据 "
+                f"({pct:.2f}%, 剩余 {clean_result['remaining']:,} 行)"
+            )
+        else:
+            st.caption("✓ 元数据完整, 无脏数据")
+
         progress_bar.progress(85, "检测重复数据...")
         status_text.info("🔍 正在检测 SN+Time 重复记录...")
         progress_bar.progress(85, "检测重复数据...")

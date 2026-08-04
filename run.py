@@ -8,6 +8,7 @@
   python run.py import             # 导入 Excel 数据
   python run.py judge              # 执行 FAI 判定
   python run.py report             # 生成分析报告
+  python run.py clean-data         # 剔除脏数据 (默认 dry-run，加 --apply 才执行)
   python run.py all                # 一键执行：导入 → 判定 → 报告
 """
 
@@ -165,6 +166,31 @@ def main():
         print("[分析] 聚合分析模块")
         from src.aggregator.cli import main as aggr_main
         aggr_main()
+    elif args[0] == "clean-data":
+        print("[清洗] 剔除缺失 Vendor/Project/Line 的脏数据")
+        from src.importer.data_cleaner import clean_glob, aggregate
+        from src.config import RAW_DIR, JUDGED_DIR
+
+        dry_run = "--apply" not in args
+        if dry_run:
+            print("→ 预览模式 (dry-run)，加 --apply 才会真正写入\n")
+        else:
+            args.remove("--apply")
+            print("→ 执行模式: 将原子替换原 parquet 文件\n")
+
+        for label, pattern in (("raw", str(RAW_DIR / "raw_*.parquet")), ("judged", str(JUDGED_DIR / "judged_*.parquet"))):
+            print(f"=== {label}: {pattern} ===")
+            results = clean_glob(pattern, dry_run=dry_run)
+            if not results:
+                print("  (无文件)\n")
+                continue
+            for r in results:
+                flag = "DRY" if r["dry_run"] else "OK"
+                print(f"  [{flag}] {Path(r["path"]).name}: rows={r["total_rows"]:,}  invalid={r["removed"]:,}  remaining={r["remaining"]:,}")
+            agg = aggregate(results)
+            print(f"  ── 汇总: 文件={agg["file_count"]} 总行={agg["total_rows"]:,} 剔除={agg["removed"]:,} 剩余={agg["remaining"]:,}")
+            print(f"     各列缺失行数: Vendor={agg["per_column"]["Vendor"]:,}  Project={agg["per_column"]["Project"]:,}  Line={agg["per_column"]["Line"]:,}\n")
+
     elif args[0] == "all":
         print("=" * 50)
         print("[一键执行] 导入 → Spec → 判定 → 报告")
@@ -184,7 +210,7 @@ def main():
         _run_dashboard(with_public=with_public)
     else:
         print(f"未知命令: {args[0]}")
-        print("可用命令: dashboard | import | spec | judge | report | all")
+        print("可用命令: dashboard | import | spec | judge | report | clean-data | all")
         print("可选参数: --public (开启公网访问)")
 
 
