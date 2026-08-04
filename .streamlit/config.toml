@@ -8,7 +8,16 @@ maxMessageSize = 2048
 # 无头模式运行
 headless = true
 
-# 关闭使用统计
+# ── 局域网访问 ─────────────────────────────────────────
+# 绑定到 0.0.0.0 才能让局域网同事访问到本机 Dashboard
+address = "0.0.0.0"
+
+# 允许跨域（局域网浏览器直接打开非 localhost 域名时必需）
+enableCORS = false
+
+# 关闭 XSRF，避免某些代理下 cookie/CSRF token 不被携带
+enableXsrfProtection = false
+
 [browser]
 gatherUsageStats = false
 
@@ -16,13 +25,3 @@ gatherUsageStats = false
 primaryColor = "#1f77b4"
 backgroundColor = "#ffffff"
 secondaryBackgroundColor = "#f0f2f6"
-
-# ── 局域网访问 ─────────────────────────────────────────
-# 绑定到 0.0.0.0 才能让局域网同事访问到本机 Dashboard
-serverAddress = "0.0.0.0"
-
-# 允许跨域（局域网浏览器直接打开非 localhost 域名时必需）
-enableCORS = false
-
-# 关闭 XSRF，避免某些代理下 cookie/CSRF token 不被携带
-enableXsrfProtection = false
