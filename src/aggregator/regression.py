@@ -199,10 +199,16 @@ def _build_unique_sn_query(
         )
     extra_where = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
 
-    select_clause = (
-        "*" if columns == "all"
-        else 'SN, "Line", "Time", "Project", "Vendor", "Yield3", "overall_result"'
-    )
+    if columns == "core":
+        select_clause = 'SN, "Line", "Time", "Project", "Vendor", "Yield3", "overall_result"'
+    elif columns == "minimal":
+        # 用 DuckDB COLUMNS 表达式做 SQL 层列剪枝
+        # — 同时排除 _result 列和 overall_result, 让 parquet 列读取减半
+        select_clause = (
+            "COLUMNS(c -> c NOT SIMILAR TO '.*_result' AND c <> 'overall_result')"
+        )
+    else:  # "all" 或其他
+        select_clause = "*"
 
     return f"""
         WITH ranked AS (
@@ -237,7 +243,10 @@ def get_regression_unique_sn(
     Args:
         cfg: 可选的 Line 精确筛选。
         start_date, end_date: 日期范围 (YYYY-MM-DD)。
-        columns: "core" = 关键列轻量, "all" = 全列（排除_result）。
+        columns:
+            - "core"     = 关键列 (含 overall_result)
+            - "minimal"  = 全部测量列 + 元数据 (SQL 层剔除 _result/overall_result)
+            - "all"      = 全列 (含 _result/overall_result)
         vendor: 可选的 Vendor 精确筛选。
 
     Returns:
@@ -250,11 +259,10 @@ def get_regression_unique_sn(
     if "Time" in df.columns:
         df["Time"] = pd.to_datetime(df["Time"], errors="coerce")
 
-    # full_columns 模式下排除判定列（保留纯测量数据，不含判定信息）
+    # 兜底: 如果 "all" 模式仍含 _result/overall_result, 客户端再 drop 一次
+    # (向后兼容保留 - 未来可能废弃 "all" 模式)
     if columns == "all":
-        drop_cols = [c for c in df.columns if c.endswith("_result")]
-        if "overall_result" in df.columns:
-            drop_cols.append("overall_result")
+        drop_cols = [c for c in df.columns if c.endswith("_result") or c == "overall_result"]
         if drop_cols:
             df = df.drop(columns=drop_cols)
 

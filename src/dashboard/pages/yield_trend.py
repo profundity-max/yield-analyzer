@@ -320,13 +320,14 @@ def _to_csv(series_map: dict) -> bytes:
 
 
 def _render_regression_download_panel():
-    from src.aggregator.regression import get_regression_unique_sn_rawdata
+    from src.aggregator.regression import get_regression_unique_sn
 
     st.markdown("---")
     st.subheader("📥 回归后的唯一 SN Rawdata 下载")
     st.caption(
-        "按 **SN 回归规则**（同一 SN 取最新投产记录）去重后的全量原始测量数据，"
-        "包含所有 FAI 列 + _result 列 + overall_result，可直接用于离线分析。"
+        "按 **SN 回归规则**（同一 SN 取最新投产记录）去重后的原始测量数据。"
+        "默认仅导出 **最近一天**, 仅包含 **元数据 + 测量值** (不包含 _result 判定列与 overall_result), "
+        "大幅减少后端计算量与下载体积。展开下方筛选条件可自定义日期/Line/Vendor。"
     )
 
     try:
@@ -340,11 +341,11 @@ def _render_regression_download_panel():
     except Exception as e:
         st.warning(f"统计信息加载失败: {e}")
 
-    with st.expander("🔧 筛选条件（可选）", expanded=True):
+    with st.expander("🔧 筛选条件（默认只导最近一天）", expanded=True):
         col1, col2, col3, col4 = st.columns(4)
         with col1:
-            use_date_range = st.checkbox("按日期筛选", value=False,
-                                         help="按 Time 字段过滤数据范围")
+            use_date_range = st.checkbox("按日期筛选", value=True,
+                                         help="按 Time 字段过滤数据范围 (默认最近一天)")
         with col2:
             use_line_filter = st.checkbox("按 Line 筛选", value=False)
         with col3:
@@ -367,9 +368,10 @@ def _render_regression_download_panel():
                 min_d = date(2026, 1, 1)
                 max_d = date.today()
 
+            # 默认最近一天 (start = end = max)
             dc1, dc2 = st.columns(2)
             with dc1:
-                start_date = st.date_input("起始日期", value=min_d,
+                start_date = st.date_input("起始日期", value=max_d,
                                            min_value=min_d, max_value=max_d,
                                            key="reg_start")
             with dc2:
@@ -391,11 +393,12 @@ def _render_regression_download_panel():
 
     st.markdown("##### 预览（前 20 行）")
     try:
-        df_preview = get_regression_unique_sn_rawdata(
+        df_preview = get_regression_unique_sn(
             cfg=line_value,
             vendor=vendor_value,
             start_date=start_date.isoformat() if start_date else None,
             end_date=end_date.isoformat() if end_date else None,
+            columns="minimal",
         )
     except Exception as e:
         st.error(f"查询失败: {e}")
