@@ -96,3 +96,19 @@ ehthumbs_vista.db
 .fseventsd
 .VolumeIcon.icns
 .com.apple.timemachine.donotpresent
+
+# AIM D-T
+.worktrees/
+aim-dt/backend/.venv/
+aim-dt/backend/.pytest_cache/
+aim-dt/backend/.coverage
+aim-dt/backend/htmlcov/
+aim-dt/frontend/node_modules/
+aim-dt/frontend/dist/
+aim-dt/storage/
+aim-dt/.env
+aim-dt/certs/
+*.tsbuildinfo
+aim-dt/frontend/vite.config.js
+aim-dt/frontend/vite.config.d.ts
+*.inspect.ndjson
