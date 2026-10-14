@@ -192,6 +192,7 @@ def analyze_parquet(
     filters: dict[str, Any],
     snapshot_dir: Path,
     heartbeat=None,
+    category_labels: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     snapshot_dir.mkdir(parents=True, exist_ok=True)
     detail_path = snapshot_dir / "events.parquet"
@@ -302,6 +303,10 @@ def analyze_parquet(
                     },
                     mapping,
                 )
+                labels = category_labels or {}
+                event.cell = labels.get(event.cell, event.cell)
+                event.tester = labels.get(event.tester, event.tester)
+                event.qpl = labels.get(event.qpl, event.qpl)
                 if filters.get("cells") and event.cell not in filters["cells"]:
                     continue
                 if filters.get("testers") and event.tester not in filters["testers"]:

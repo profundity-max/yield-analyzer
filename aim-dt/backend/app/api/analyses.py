@@ -15,7 +15,8 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.deps import current_user, require_role
 from app.models import AnalysisRun, AuditLog, Batch, MappingVersion, SpecVersion, User
-from app.schemas import AnalysisCreate, AnalysisView
+from app.schemas import AnalysisCreate, AnalysisView, RerunWithRequest
+from app.services.configurations import link_analysis_batches
 from app.services.rules import canonical_json
 
 router = APIRouter(prefix="/analyses", tags=["analyses"])
@@ -89,6 +90,8 @@ def create_analysis(
         requested_by=user.id,
     )
     db.add(run)
+    db.flush()
+    link_analysis_batches(db, run, [item.id for item in batches])
     db.add(
         AuditLog(
             actor_user_id=user.id,
@@ -139,6 +142,57 @@ def retry_analysis(
     run.cancel_requested = False
     run.started_at = None
     run.completed_at = None
+    db.commit()
+    db.refresh(run)
+    return AnalysisView.model_validate(run)
+
+
+@router.post(
+    "/{run_id}/rerun-with", response_model=AnalysisView, status_code=status.HTTP_202_ACCEPTED
+)
+def rerun_with(
+    run_id: str,
+    payload: RerunWithRequest,
+    user: User = Depends(require_role("admin", "analyst")),
+    db: Session = Depends(get_db),
+) -> AnalysisView:
+    source = _get_run(db, run_id)
+    spec = db.get(SpecVersion, payload.spec_version_id)
+    if spec is None or spec.status == "retired":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="规格版本不可用")
+    if payload.mapping_version_id:
+        mapping = db.get(MappingVersion, payload.mapping_version_id)
+        if mapping is None or mapping.status == "retired":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Mapping 版本不可用"
+            )
+    run = AnalysisRun(
+        name=f"{source.name} · 重算",
+        filters_json=source.filters_json,
+        spec_version_id=payload.spec_version_id,
+        mapping_version_id=payload.mapping_version_id,
+        requested_by=user.id,
+    )
+    db.add(run)
+    db.flush()
+    filters = json.loads(source.filters_json)
+    link_analysis_batches(db, run, filters.get("batch_ids") or [])
+    db.add(
+        AuditLog(
+            actor_user_id=user.id,
+            action="rerun_with",
+            entity_type="analysis",
+            entity_id=run.id,
+            detail_json=json.dumps(
+                {
+                    "source_run_id": source.id,
+                    "spec_version_id": payload.spec_version_id,
+                    "mapping_version_id": payload.mapping_version_id,
+                },
+                ensure_ascii=False,
+            ),
+        )
+    )
     db.commit()
     db.refresh(run)
     return AnalysisView.model_validate(run)

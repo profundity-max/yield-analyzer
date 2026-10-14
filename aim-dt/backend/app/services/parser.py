@@ -19,7 +19,7 @@ from openpyxl import load_workbook
 from app.config import get_settings
 
 settings = get_settings()
-DEFAULT_POINTS = ["T1-T2", "T1-T3", "T1-T4", "T1-T5", "T1-T6"]
+DEFAULT_POINTS = ["T1-T2", "T1-T3", "T1-T4", "T1-T5"]
 COMMON_HEADERS = ["产品SN", "检测时间", "config"]
 ERROR_SENTINELS = {-999.0, 9999.0}
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
@@ -9,7 +10,8 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.deps import current_user, require_role
 from app.models import AuditLog, Batch, User
-from app.schemas import BatchView
+from app.schemas import BatchView, WorkbenchState
+from app.services.configurations import latest_analysis_for_batch
 from app.services.rules import canonical_json
 from app.services.storage import new_batch_id, save_upload
 
@@ -23,6 +25,43 @@ def list_batches(
 ) -> list[BatchView]:
     items = db.scalars(select(Batch).order_by(Batch.created_at.desc())).all()
     return [BatchView.model_validate(item) for item in items]
+
+
+@router.get("/{batch_id}/workbench", response_model=WorkbenchState)
+def get_workbench(
+    batch_id: str,
+    _user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+) -> WorkbenchState:
+    batch = db.get(Batch, batch_id)
+    if batch is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="批次不存在")
+    run = latest_analysis_for_batch(db, batch_id)
+    unmatched_count = 0
+    if run and run.summary_json:
+        try:
+            summary = json.loads(run.summary_json)
+            unmatched_count = int(summary.get("quality", {}).get("unknown_mapping_events", 0))
+        except (json.JSONDecodeError, TypeError, ValueError):
+            unmatched_count = 0
+    stage = batch.status
+    progress = 0.0
+    if batch.status == "ready":
+        progress = 20.0
+    if run:
+        stage = run.phase
+        progress = max(progress, float(run.progress))
+    return WorkbenchState(
+        batch_id=batch.id,
+        batch_status=batch.status,
+        analysis_id=run.id if run else None,
+        analysis_status=run.status if run else None,
+        stage=stage,
+        progress=progress,
+        unmatched_count=unmatched_count,
+        needs_configuration=False,
+        error_message=batch.error_message or (run.error_message if run else None),
+    )
 
 
 @router.get("/{batch_id}", response_model=BatchView)

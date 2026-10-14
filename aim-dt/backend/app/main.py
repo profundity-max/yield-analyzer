@@ -13,6 +13,7 @@ from app.config import get_settings
 from app.db import Base, SessionLocal, engine
 from app.models import User
 from app.security import hash_password
+from app.services.configurations import ensure_default_spec, seed_categories
 from app.services.storage import init_analytics_db
 
 settings = get_settings()
@@ -38,10 +39,14 @@ async def lifespan(_app: FastAPI):
     Base.metadata.create_all(engine)
     init_analytics_db()
     bootstrap_admin()
+    with SessionLocal() as db:
+        seed_categories(db)
+        admin = db.scalar(select(User).where(User.username == settings.bootstrap_admin_username))
+        ensure_default_spec(db, created_by=admin.id if admin else None)
     yield
 
 
-app = FastAPI(title=settings.app_name, version="1.1.0", lifespan=lifespan)
+app = FastAPI(title=settings.app_name, version="2.0.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
@@ -67,7 +72,7 @@ async def unhandled_exception(_request: Request, exc: Exception) -> JSONResponse
 
 @app.get("/api/v1/health")
 def health() -> dict:
-    return {"status": "ok", "version": "1.1.0"}
+    return {"status": "ok", "version": "2.0.0"}
 
 
 @app.get("/{path:path}")

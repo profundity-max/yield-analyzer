@@ -168,3 +168,79 @@ export interface EventRow {
   measurement_json: string
   point_results_json: string
 }
+
+export interface PointConfig {
+  code: string
+  source_column?: string | null
+  enabled: boolean
+  lsl: number | null
+  usl: number | null
+  detected: boolean
+}
+
+export interface SpecEditor {
+  id: string
+  name: string
+  status: string
+  points: PointConfig[]
+  created_at: string
+  confirmed_at?: string | null
+}
+
+export interface Category {
+  id: string
+  kind: 'cell' | 'tester' | 'qpl'
+  code: string
+  label: string
+  active: boolean
+  sort_order: number
+}
+
+export interface MappingEditorSource {
+  site_name?: string | null
+  equipment_id?: string | null
+  config?: string | null
+  slot?: string | null
+}
+
+export interface MappingEditorTarget {
+  cell: string
+  tester: string
+  qpl: string
+}
+
+export interface MappingEditorRow {
+  source: MappingEditorSource
+  target: MappingEditorTarget
+  match_count: number
+  status: 'mapped' | 'unmapped' | 'disabled'
+}
+
+export interface MappingEditor {
+  mapping_version_id?: string | null
+  mapping_name?: string | null
+  rules: MappingEditorRow[]
+  unmapped: MappingEditorRow[]
+  categories: Record<'cell' | 'tester' | 'qpl', Category[]>
+}
+
+export interface WorkbenchState {
+  batch_id: string
+  batch_status: string
+  analysis_id?: string | null
+  analysis_status?: string | null
+  stage: string
+  progress: number
+  unmatched_count: number
+  needs_configuration: boolean
+  error_message?: string | null
+}
+
+export interface ConfigOptions {
+  active_spec_id?: string | null
+  active_mapping_id?: string | null
+  specs: Array<{ id: string; name: string; status: string; created_at: string }>
+  mappings: Array<{ id: string; name: string; status: string; created_at: string }>
+  points: PointConfig[]
+  categories: Record<'cell' | 'tester' | 'qpl', Category[]>
+}

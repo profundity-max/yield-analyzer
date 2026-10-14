@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.models import AnalysisRun, Batch, MappingVersion, SpecVersion
+from app.models import AnalysisRun, Batch, Category, MappingVersion, SpecVersion
 from app.services.analytics import analyze_parquet
 from app.services.batches import process_batch
 from app.services.rules import load_json
@@ -108,6 +108,9 @@ def process_analysis(db: Session, run: AnalysisRun) -> dict:
             run.heartbeat_at = utcnow_naive()
             db.commit()
 
+        category_labels = {
+            item.code: item.label for item in db.scalars(select(Category)) if item.code
+        }
         summary = analyze_parquet(
             paths,
             spec=spec_rules,
@@ -115,6 +118,7 @@ def process_analysis(db: Session, run: AnalysisRun) -> dict:
             filters=filters,
             snapshot_dir=snapshot_dir,
             heartbeat=heartbeat,
+            category_labels=category_labels,
         )
         warnings = summary.get("meta", {}).get("warnings", [])
         run.summary_json = json.dumps(summary, ensure_ascii=False)

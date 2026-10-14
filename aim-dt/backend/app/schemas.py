@@ -8,7 +8,13 @@ from pydantic import BaseModel, ConfigDict, Field
 Role = Literal["admin", "analyst", "viewer"]
 BatchStatus = Literal["uploaded", "validating", "importing", "ready", "deleting", "failed"]
 AnalysisStatus = Literal[
-    "queued", "running", "completed", "completed_with_warnings", "failed", "cancelled"
+    "queued",
+    "running",
+    "completed",
+    "completed_with_warnings",
+    "needs_configuration",
+    "failed",
+    "cancelled",
 ]
 RuleStatus = Literal["draft", "active", "retired"]
 Outcome = Literal["PASS", "FAIL", "ERROR"]
@@ -151,6 +157,104 @@ class AnalysisView(BaseModel):
     created_at: datetime
     started_at: datetime | None
     completed_at: datetime | None
+
+
+class PointConfig(BaseModel):
+    code: str
+    source_column: str | None = None
+    enabled: bool = True
+    lsl: float | None = 0
+    usl: float | None = 2
+    detected: bool = False
+
+
+class SpecEditorPayload(BaseModel):
+    name: str
+    points: list[PointConfig]
+    source_batch_id: str | None = None
+
+
+class SpecEditorView(BaseModel):
+    id: str
+    name: str
+    status: RuleStatus
+    points: list[PointConfig]
+    created_at: datetime
+    confirmed_at: datetime | None = None
+
+
+class CategoryCreate(BaseModel):
+    kind: Literal["cell", "tester", "qpl"]
+    code: str
+    label: str
+    sort_order: int = 0
+
+
+class CategoryUpdate(BaseModel):
+    label: str | None = None
+    active: bool | None = None
+    sort_order: int | None = None
+
+
+class CategoryView(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    kind: Literal["cell", "tester", "qpl"]
+    code: str
+    label: str
+    active: bool
+    sort_order: int
+
+
+class MappingEditorSource(BaseModel):
+    site_name: str | None = None
+    equipment_id: str | None = None
+    config: str | None = None
+    slot: str | None = None
+
+
+class MappingEditorTarget(BaseModel):
+    cell: str = "Unassigned"
+    tester: str = "Unassigned"
+    qpl: str = "Unassigned"
+
+
+class MappingEditorRow(BaseModel):
+    source: MappingEditorSource
+    target: MappingEditorTarget
+    match_count: int = 0
+    status: Literal["mapped", "unmapped", "disabled"] = "unmapped"
+
+
+class MappingEditorPayload(BaseModel):
+    name: str
+    batch_id: str
+    rows: list[MappingEditorRow]
+
+
+class MappingEditorView(BaseModel):
+    mapping_version_id: str | None = None
+    mapping_name: str | None = None
+    rules: list[MappingEditorRow]
+    unmapped: list[MappingEditorRow]
+    categories: dict[str, list[CategoryView]]
+
+
+class WorkbenchState(BaseModel):
+    batch_id: str
+    batch_status: BatchStatus
+    analysis_id: str | None = None
+    analysis_status: AnalysisStatus | None = None
+    stage: str
+    progress: float = 0.0
+    unmatched_count: int = 0
+    needs_configuration: bool = False
+    error_message: str | None = None
+
+
+class RerunWithRequest(BaseModel):
+    spec_version_id: str
+    mapping_version_id: str | None = None
 
 
 class Page(BaseModel):

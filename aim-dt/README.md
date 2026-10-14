@@ -1,13 +1,14 @@
-# AIM D-T 数据分析网站 V1.1
+# AIM D-T 数据分析网站 V2.0
 
 内网 AIM D-T 原始数据上传、后台判定、结果图表与质量追溯平台。首版包含：
 
-- XLSX / CSV 上传、表头和 USL/LSL 预检
+- XLSX / CSV 上传后在分析中心原地展示进度和图表
+- 文件内嵌 USL/LSL 优先，默认标准规格启用 `T1-T2` 到 `T1-T5`
 - 按 `SN + 检测时间 + 启用点测量值` 去重，保留重复来源
 - 首测、复测、最终结果、Error/NG 口径
 - PPT 对应的总览 KPI、时良率、Pareto、Cell、Tester、分布和 SN 明细
 - PNG 图表下载、明细 CSV、汇总 XLSX
-- admin / analyst / viewer 三级权限、规格确认、Mapping 和审计
+- admin / analyst / viewer 三级权限、可视化 Spec/Mapping/类别配置和审计
 
 ## 目录
 
@@ -58,7 +59,7 @@ cd backend && .venv/bin/pytest -q
 cd frontend && pnpm test && pnpm build
 ```
 
-样例数据校验结果：182 条原始记录去重为 91 个事件、90 个 SN；Avg Processing Time 为 8.99 ms；五个测试点的最终失败单位数分别为 26、46、64、67、90。
+样例数据校验结果：182 条原始记录去重为 91 个事件、90 个 SN；默认四点结果为 90 个输入、12 个最终通过、78 个最终 NG；Pareto 分别为 26、46、64、67；Avg Processing Time 为 8.99 ms。
 
 ## 生产部署
 
@@ -85,8 +86,9 @@ cd frontend && pnpm test && pnpm build
 主要入口位于 `/api/v1`：
 
 - `/auth/login|logout|me|change-password`
-- `/batches`
-- `/analyses`、`/analyses/{id}/summary|events|exports/...`
-- `/admin/specs|mappings|users|audit-logs`
+- `/batches`、`/batches/{id}/workbench`
+- `/analyses`、`/analyses/{id}/rerun-with|summary|events|exports/...`
+- `/specs/editor`、`/mapping-editor`、`/mappings/editor`、`/categories`
+- `/admin/specs|mappings|users|audit-logs`（兼容旧接口）
 
 完整 OpenAPI 文档在运行后访问 `/docs`。

@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import AnalysisRun, Batch, MappingVersion, SpecVersion, User
+from app.services.configurations import ensure_default_spec, link_analysis_batches
 from app.services.parser import DEFAULT_POINTS, parse_file, write_parquet
 from app.services.rules import canonical_json, fingerprint
 
@@ -67,19 +68,22 @@ def process_batch(db: Session, batch: Batch) -> None:
             spec_for_run = db.scalar(
                 select(SpecVersion).where(SpecVersion.fingerprint == spec_hash)
             )
-            mapping_for_run = db.scalar(
-                select(MappingVersion).where(MappingVersion.status == "active").limit(1)
+        else:
+            spec_for_run = ensure_default_spec(db, created_by=batch.created_by)
+        mapping_for_run = db.scalar(
+            select(MappingVersion).where(MappingVersion.status == "active").limit(1)
+        )
+        if spec_for_run is not None:
+            run = AnalysisRun(
+                name=f"{Path(batch.original_name).stem} 自动分析",
+                filters_json=canonical_json({"batch_ids": [batch.id]}),
+                spec_version_id=spec_for_run.id,
+                mapping_version_id=mapping_for_run.id if mapping_for_run else None,
+                requested_by=batch.created_by,
             )
-            if spec_for_run is not None and mapping_for_run is not None:
-                db.add(
-                    AnalysisRun(
-                        name=f"{Path(batch.original_name).stem} 临时分析",
-                        filters_json=canonical_json({"batch_ids": [batch.id]}),
-                        spec_version_id=spec_for_run.id,
-                        mapping_version_id=mapping_for_run.id,
-                        requested_by=batch.created_by,
-                    )
-                )
+            db.add(run)
+            db.flush()
+            link_analysis_batches(db, run, [batch.id])
         db.commit()
     except Exception as exc:
         db.rollback()

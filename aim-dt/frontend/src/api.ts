@@ -1,12 +1,17 @@
 import type {
   AnalysisRun,
   Batch,
+  Category,
+  ConfigOptions,
   EventRow,
+  MappingEditor,
   MappingVersion,
   SessionResponse,
+  SpecEditor,
   SpecVersion,
   Summary,
   User,
+  WorkbenchState,
 } from './types'
 
 let csrfToken = ''
@@ -64,6 +69,9 @@ export const api = {
       body: JSON.stringify({ current_password, new_password }),
     }),
   batches: () => apiFetch<Batch[]>('/api/v1/batches'),
+  workbench: (batchId: string) => apiFetch<WorkbenchState>(`/api/v1/batches/${batchId}/workbench`),
+  configOptions: (batchId?: string) =>
+    apiFetch<ConfigOptions>(`/api/v1/config/options${batchId ? `?batch_id=${batchId}` : ''}`),
   uploadBatch: (file: File) => {
     const form = new FormData()
     form.append('file', file)
@@ -77,6 +85,35 @@ export const api = {
     apiFetch<{ items: EventRow[]; total: number; page: number; page_size: number }>(
       `/api/v1/analyses/${id}/events?page=${page}&page_size=${pageSize}${filters}`,
     ),
+  rerunWith: (id: string, specVersionId: string, mappingVersionId: string | null) =>
+    apiFetch<AnalysisRun>(`/api/v1/analyses/${id}/rerun-with`, {
+      method: 'POST',
+      body: JSON.stringify({ spec_version_id: specVersionId, mapping_version_id: mappingVersionId }),
+    }),
+  specEditor: (specId?: string, batchId?: string) => {
+    const params = new URLSearchParams()
+    if (specId) params.set('spec_id', specId)
+    if (batchId) params.set('batch_id', batchId)
+    return apiFetch<SpecEditor>(`/api/v1/specs/editor?${params.toString()}`)
+  },
+  saveSpecEditor: (payload: Record<string, unknown>) =>
+    apiFetch<SpecEditor>('/api/v1/specs/editor', { method: 'POST', body: JSON.stringify(payload) }),
+  mappingEditor: (batchId: string, mappingVersionId?: string) => {
+    const params = new URLSearchParams({ batch_id: batchId })
+    if (mappingVersionId) params.set('mapping_version_id', mappingVersionId)
+    return apiFetch<MappingEditor>(`/api/v1/mapping-editor?${params.toString()}`)
+  },
+  saveMappingEditor: (batchId: string, name: string, rows: unknown[]) =>
+    apiFetch<MappingEditor>('/api/v1/mappings/editor', {
+      method: 'POST',
+      body: JSON.stringify({ batch_id: batchId, name, rows }),
+    }),
+  categories: (includeInactive = true) =>
+    apiFetch<Category[]>(`/api/v1/categories?include_inactive=${includeInactive}`),
+  createCategory: (payload: Record<string, unknown>) =>
+    apiFetch<Category>('/api/v1/categories', { method: 'POST', body: JSON.stringify(payload) }),
+  updateCategory: (id: string, payload: Record<string, unknown>) =>
+    apiFetch<Category>(`/api/v1/categories/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
   createAnalysis: (payload: Record<string, unknown>) =>
     apiFetch<AnalysisRun>('/api/v1/analyses', {
       method: 'POST',

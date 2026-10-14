@@ -154,3 +154,30 @@ input:focus, select:focus, textarea:focus { border-color: var(--blue); box-shado
   .upload-row { grid-template-columns: 1fr; }
   .header-actions { width: 100%; }
 }
+
+/* V2 analysis workspace and configuration editors */
+.workspace { display: grid; gap: 18px; }
+.workspace.embedded { margin-top: 18px; }
+.workspace-header { display: flex; justify-content: space-between; gap: 18px; align-items: flex-start; padding: 18px 20px; background: linear-gradient(135deg,#eaf4ff,#f6fbff); border: 1px solid #cfe2f5; border-radius: 16px; }
+.workspace-header h2 { margin: 0 0 4px; }
+.workspace-header p { margin: 0; color: var(--muted); }
+.embedded-result { margin: 18px 0; }
+.live-workbench { margin: 18px 0; }
+.compact-grid { grid-template-columns: 1fr; max-height: 360px; overflow: auto; }
+.config-toolbar { display: grid; grid-template-columns: minmax(220px,1fr) minmax(260px,1fr); gap: 14px; margin-bottom: 16px; align-items: end; }
+.config-toolbar label { display: grid; gap: 6px; color: #485b72; font-size: 12px; font-weight: 700; }
+.modal-backdrop { position: fixed; inset: 0; z-index: 1000; background: rgba(8,22,40,.55); display: grid; place-items: center; padding: 24px; }
+.modal-card { width: min(1180px, calc(100vw - 40px)); max-height: calc(100vh - 48px); overflow: hidden; background: #fff; border-radius: 18px; box-shadow: 0 28px 90px rgba(0,0,0,.28); display: flex; flex-direction: column; }
+.modal-head { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; border-bottom: 1px solid var(--line); }
+.modal-head h2 { margin: 0; }
+.modal-body { padding: 20px 22px 22px; overflow: auto; }
+.modal-actions { display: flex; gap: 12px; align-items: center; justify-content: flex-end; margin-top: 18px; }
+.modal-body h3 { margin: 22px 0 10px; color: var(--navy); }
+.modal-body td input:not([type="checkbox"]), .modal-body td select { min-width: 130px; }
+.category-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(210px,1fr)); gap: 10px; margin-top: 16px; }
+.category-chip { display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: #fbfdff; }
+.category-chip small { display: block; color: var(--muted); margin-top: 3px; }
+@media (max-width: 800px) {
+  .workspace-header, .config-toolbar { grid-template-columns: 1fr; display: grid; }
+  .modal-card { width: calc(100vw - 20px); }
+}
