@@ -41,7 +41,7 @@ async def lifespan(_app: FastAPI):
     yield
 
 
-app = FastAPI(title=settings.app_name, version="1.0.0", lifespan=lifespan)
+app = FastAPI(title=settings.app_name, version="1.1.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
@@ -67,7 +67,7 @@ async def unhandled_exception(_request: Request, exc: Exception) -> JSONResponse
 
 @app.get("/api/v1/health")
 def health() -> dict:
-    return {"status": "ok", "version": "1.0.0"}
+    return {"status": "ok", "version": "1.1.0"}
 
 
 @app.get("/{path:path}")

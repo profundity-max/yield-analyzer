@@ -112,3 +112,4 @@ aim-dt/certs/
 aim-dt/frontend/vite.config.js
 aim-dt/frontend/vite.config.d.ts
 *.inspect.ndjson
+aim-dt/.initial-admin.txt

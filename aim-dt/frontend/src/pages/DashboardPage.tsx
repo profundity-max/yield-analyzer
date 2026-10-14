@@ -74,7 +74,7 @@ export function DashboardPage() {
     <div className="page">
       <header className="page-header">
         <div>
-          <span className="eyebrow">AIM D-T · V1.0</span>
+          <span className="eyebrow">AIM D-T · V1.1</span>
           <h1>分析中心</h1>
           <p>上传原始数据、查看后台任务，并进入 PPT 对应的结果看板。</p>
         </div>
