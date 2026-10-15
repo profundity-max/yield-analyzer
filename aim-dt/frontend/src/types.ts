@@ -74,6 +74,8 @@ export interface Kpis {
   first_pass_qty: number
   final_pass_qty: number
   final_ng_qty: number
+  final_fail_qty: number
+  final_error_qty: number
   first_pass_rate: number | null
   final_pass_rate: number | null
   retest_pass_qty: number
@@ -89,12 +91,14 @@ export interface TimeYieldPoint {
   bucket: string
   input_qty: number
   pass_qty: number
-  fail_error_qty: number
+  fail_qty: number
+  error_qty: number
   yield_rate: number | null
 }
 
 export interface ParetoPoint {
   point: string
+  outcome: 'FAIL' | 'ERROR'
   count: number
   pct_total_input: number | null
 }
@@ -104,6 +108,8 @@ export interface CellYieldPoint {
   first_pass: number
   retest_pass: number
   final_ng: number
+  final_fail: number
+  final_error: number
   total: number
 }
 
@@ -128,6 +134,7 @@ export interface DistributionPoint {
   q3: number
   max: number
   mean: number
+  stddev: number
   lsl: number | null
   usl: number | null
   density: Array<{ x: number; density: number }>
@@ -243,4 +250,51 @@ export interface ConfigOptions {
   mappings: Array<{ id: string; name: string; status: string; created_at: string }>
   points: PointConfig[]
   categories: Record<'cell' | 'tester' | 'qpl', Category[]>
+}
+
+export interface DataModuleView {
+  id: string
+  name: string
+  active_batch_id?: string | null
+  active_filename?: string | null
+  active_revision: number
+  row_count: number
+  event_count: number
+  status: string
+  uploaded_at: string
+  previous_batch_id?: string | null
+  previous_filename?: string | null
+  previous_revision?: number | null
+  previous_available: boolean
+}
+
+export interface RefreshLogView {
+  id: string
+  module_id?: string | null
+  module_name?: string | null
+  trigger: string
+  status: string
+  analysis_run_id?: string | null
+  from_filename?: string | null
+  to_filename?: string | null
+  detail: Record<string, unknown>
+  created_at: string
+  completed_at?: string | null
+}
+
+export interface MasterWorkbench {
+  master_id: string
+  name: string
+  current_analysis_id?: string | null
+  last_success_analysis_id?: string | null
+  analysis_status?: string | null
+  stage: string
+  progress: number
+  module_count: number
+  total_rows: number
+  total_events: number
+  unmatched_count: number
+  modules: DataModuleView[]
+  logs: RefreshLogView[]
+  error_message?: string | null
 }

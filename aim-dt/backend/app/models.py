@@ -131,11 +131,68 @@ class Batch(Base):
     error_count: Mapped[int] = mapped_column(Integer, default=0)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     summary_json: Mapped[str] = mapped_column(Text, default="{}")
+    data_module_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    revision: Mapped[int] = mapped_column(Integer, default=1)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    replaced_from_batch_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    replaced_by_batch_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    superseded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    file_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
     created_by: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     ready_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (UniqueConstraint("file_sha256", name="uq_batch_file_sha256"),)
+
+
+class MasterDataSource(Base):
+    __tablename__ = "master_data_sources"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    name: Mapped[str] = mapped_column(String(120), default="AIM D-T 总数据源")
+    current_analysis_run_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    last_success_analysis_run_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+
+class DataModule(Base):
+    __tablename__ = "data_modules"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    master_source_id: Mapped[str] = mapped_column(
+        ForeignKey("master_data_sources.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(255))
+    active_batch_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    created_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
+
+
+class RefreshLog(Base):
+    __tablename__ = "refresh_logs"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    master_source_id: Mapped[str] = mapped_column(
+        ForeignKey("master_data_sources.id", ondelete="CASCADE"), index=True
+    )
+    module_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    trigger: Mapped[str] = mapped_column(String(40), index=True)
+    status: Mapped[str] = mapped_column(String(20), default="queued", index=True)
+    analysis_run_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    from_batch_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    to_batch_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    detail_json: Mapped[str] = mapped_column(Text, default="{}")
+    requested_by: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, index=True
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class AnalysisRun(Base):

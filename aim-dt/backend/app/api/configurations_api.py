@@ -23,6 +23,7 @@ from app.services.configurations import (
     mapping_editor_view,
     spec_to_editor,
 )
+from app.services.master import active_batches, create_master_analysis
 from app.services.rules import canonical_json
 
 router = APIRouter(tags=["configuration"])
@@ -58,12 +59,8 @@ def config_options(
     batch = _batch(db, batch_id)
     spec = _active_spec(db)
     mapping = _active_mapping(db)
-    specs = db.scalars(
-        select(SpecVersion).order_by(SpecVersion.created_at.desc())
-    ).all()
-    mappings = db.scalars(
-        select(MappingVersion).order_by(MappingVersion.created_at.desc())
-    ).all()
+    specs = db.scalars(select(SpecVersion).order_by(SpecVersion.created_at.desc())).all()
+    mappings = db.scalars(select(MappingVersion).order_by(MappingVersion.created_at.desc())).all()
     categories = categories_by_kind(db)
     return {
         "active_spec_id": spec.id if spec else None,
@@ -112,22 +109,28 @@ def save_spec_editor(
         user=user,
         source_batch_id=payload.source_batch_id,
     )
+    if active_batches(db):
+        create_master_analysis(db, trigger="spec_change", requested_by=user.id)
     return SpecEditorView.model_validate(spec_to_editor(spec, _batch(db, payload.source_batch_id)))
 
 
 @router.get("/mapping-editor", response_model=MappingEditorView)
 def get_mapping_editor(
-    batch_id: str,
+    batch_id: str | None = None,
     mapping_version_id: str | None = None,
     _user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> MappingEditorView:
-    batch = _batch(db, batch_id)
-    assert batch is not None
+    batches = [_batch(db, batch_id)] if batch_id else active_batches(db)
+    batches = [item for item in batches if item is not None]
+    if not batches:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="总数据源没有可用模块")
     mapping = (
         db.get(MappingVersion, mapping_version_id) if mapping_version_id else _active_mapping(db)
     )
-    return MappingEditorView.model_validate(mapping_editor_view(db, batch=batch, mapping=mapping))
+    return MappingEditorView.model_validate(
+        mapping_editor_view(db, batches=batches, mapping=mapping)
+    )
 
 
 @router.post("/mappings/editor", response_model=MappingEditorView)
@@ -138,10 +141,17 @@ def save_mapping_editor(
 ) -> MappingEditorView:
     rows = [item.model_dump(mode="json") for item in payload.rows]
     mapping = create_active_mapping(db, name=payload.name, rows=rows, user=user)
-    batch = _batch(db, payload.batch_id)
-    if batch is None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="没有可用于预览的批次")
-    return MappingEditorView.model_validate(mapping_editor_view(db, batch=batch, mapping=mapping))
+    batches = active_batches(db)
+    if payload.batch_id:
+        selected = _batch(db, payload.batch_id)
+        if selected is not None:
+            batches = [selected]
+    if not batches:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="总数据源没有可用模块")
+    create_master_analysis(db, trigger="mapping_change", requested_by=user.id)
+    return MappingEditorView.model_validate(
+        mapping_editor_view(db, batches=batches, mapping=mapping)
+    )
 
 
 @router.get("/categories", response_model=list[CategoryView])

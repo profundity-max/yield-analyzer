@@ -194,22 +194,21 @@ def categories_by_kind(db: Session, include_inactive: bool = False) -> dict[str,
     return result
 
 
-def _dedup_path(path: Path) -> tuple[str, list[str]]:
-    if not path.exists():
-        raise FileNotFoundError(path)
-    return str(path).replace("'", "''"), []
-
-
-def distinct_source_combinations(batch: Batch) -> list[dict[str, Any]]:
-    if not batch.parquet_path:
+def distinct_source_combinations(batches: list[Batch]) -> list[dict[str, Any]]:
+    paths = [
+        batch.parquet_path
+        for batch in batches
+        if batch.parquet_path and Path(batch.parquet_path).exists()
+    ]
+    if not paths:
         return []
-    path_literal, _ = _dedup_path(Path(batch.parquet_path))
+    path_sql = ",".join("'" + str(path).replace("'", "''") + "'" for path in paths)
     con = duckdb.connect(":memory:")
     try:
         rows = con.execute(
             f"""
             WITH combined AS (
-                SELECT * FROM read_parquet('{path_literal}')
+                SELECT * FROM read_parquet([{path_sql}])
             ), dedup AS (
                 SELECT *, ROW_NUMBER() OVER (
                     PARTITION BY event_hash ORDER BY detected_at, source_sequence
@@ -265,14 +264,14 @@ def _best_rule(source: dict[str, Any], rules: list[dict[str, Any]]) -> int | Non
 def mapping_editor_view(
     db: Session,
     *,
-    batch: Batch,
+    batches: list[Batch],
     mapping: MappingVersion | None,
 ) -> dict[str, Any]:
     rules = json.loads(mapping.rules_json) if mapping and mapping.rules_json else []
     rows: list[dict[str, Any]] = []
     match_counts = [0] * len(rules)
     unmapped: list[dict[str, Any]] = []
-    for combination in distinct_source_combinations(batch):
+    for combination in distinct_source_combinations(batches):
         source = combination["source"]
         index = _best_rule(source, rules)
         if index is None:
@@ -406,6 +405,6 @@ def latest_analysis_for_batch(db: Session, batch_id: str) -> AnalysisRun | None:
     )
 
 
-def unmapped_count(db: Session, batch: Batch, mapping: MappingVersion | None) -> int:
-    view = mapping_editor_view(db, batch=batch, mapping=mapping)
+def unmapped_count(db: Session, batches: list[Batch], mapping: MappingVersion | None) -> int:
+    view = mapping_editor_view(db, batches=batches, mapping=mapping)
     return sum(row["match_count"] for row in view["unmapped"])

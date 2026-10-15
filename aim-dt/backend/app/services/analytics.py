@@ -220,7 +220,7 @@ def analyze_parquet(
         enabled_points = spec["enabled_points"]
         spec_rules = spec["rules"]
         time_buckets: dict[str, dict[str, int]] = defaultdict(
-            lambda: {"input": 0, "pass": 0, "fail_error": 0}
+            lambda: {"input": 0, "pass": 0, "fail": 0, "error": 0}
         )
         tester_stats: dict[tuple[str, str, str], dict[str, int]] = defaultdict(
             lambda: {"pass": 0, "fail": 0, "error": 0}
@@ -234,7 +234,7 @@ def analyze_parquet(
         total_events = 0
         current_sn: str | None = None
         unit_events: list[EventRow] = []
-        pareto_counts: Counter[str] = Counter()
+        pareto_counts: Counter[tuple[str, str]] = Counter()
         cell_pie: dict[str, Counter[str]] = defaultdict(Counter)
         unit_states: Counter[str] = Counter()
         detail_batch: list[dict[str, Any]] = []
@@ -254,9 +254,14 @@ def analyze_parquet(
                 else:
                     unit_states["retest_pass"] += 1
                     cell_pie[last.cell]["Retest Pass"] += 1
+            elif last.outcome == "ERROR":
+                unit_states["final_ng"] += 1
+                unit_states["final_error"] += 1
+                cell_pie[last.cell]["Final Error"] += 1
             else:
                 unit_states["final_ng"] += 1
-                cell_pie[last.cell]["Final NG"] += 1
+                unit_states["final_fail"] += 1
+                cell_pie[last.cell]["Final Fail"] += 1
             if first.outcome != "PASS":
                 if len(events) > 1:
                     unit_states["retested_first_fail"] += 1
@@ -265,9 +270,9 @@ def analyze_parquet(
             if last.outcome != "PASS":
                 for point, result in last.point_results.items():
                     if result != "PASS":
-                        pareto_counts[point] += 1
+                        pareto_counts[(point, result)] += 1
                 if not last.point_results:
-                    pareto_counts["ERROR"] += 1
+                    pareto_counts[("ERROR", "ERROR")] += 1
 
         while True:
             rows = cursor.fetchmany(20_000)
@@ -319,10 +324,7 @@ def analyze_parquet(
                 hour = event.detected_at.replace(minute=0, second=0, microsecond=0)
                 bucket = hour.isoformat(timespec="minutes")
                 time_buckets[bucket]["input"] += 1
-                if event.outcome == "PASS":
-                    time_buckets[bucket]["pass"] += 1
-                else:
-                    time_buckets[bucket]["fail_error"] += 1
+                time_buckets[bucket][event.outcome.lower()] += 1
                 tester_key = (event.cell, event.qpl, event.tester)
                 tester_stats[tester_key][event.outcome.lower()] += 1
                 if event.processing_ms is not None and event.processing_ms not in SENTINELS:
@@ -382,6 +384,8 @@ def analyze_parquet(
     retest_pass_qty = unit_states["retest_pass"]
     final_pass_qty = first_pass_qty + retest_pass_qty
     final_ng_qty = total_input - final_pass_qty
+    final_fail_qty = unit_states["final_fail"]
+    final_error_qty = unit_states["final_error"]
     retest_denominator = unit_states["retested_first_fail"]
     time_yield = []
     for bucket, item in sorted(time_buckets.items()):
@@ -390,13 +394,19 @@ def analyze_parquet(
                 "bucket": bucket,
                 "input_qty": item["input"],
                 "pass_qty": item["pass"],
-                "fail_error_qty": item["fail_error"],
+                "fail_qty": item["fail"],
+                "error_qty": item["error"],
                 "yield_rate": _ratio(item["pass"], item["input"]),
             }
         )
     pareto = [
-        {"point": point, "count": count, "pct_total_input": _ratio(count, total_input)}
-        for point, count in pareto_counts.most_common()
+        {
+            "point": point,
+            "outcome": outcome,
+            "count": count,
+            "pct_total_input": _ratio(count, total_input),
+        }
+        for (point, outcome), count in pareto_counts.most_common()
     ]
     tester_yield = []
     for (cell, qpl, tester), item in sorted(tester_stats.items()):
@@ -420,7 +430,9 @@ def analyze_parquet(
                 "cell": cell,
                 "first_pass": counts["First Pass"],
                 "retest_pass": counts["Retest Pass"],
-                "final_ng": counts["Final NG"],
+                "final_ng": counts["Final Fail"] + counts["Final Error"],
+                "final_fail": counts["Final Fail"],
+                "final_error": counts["Final Error"],
                 "total": total,
             }
         )
@@ -443,6 +455,7 @@ def analyze_parquet(
                 "q3": round(float(np.quantile(array, 0.75)), 6),
                 "max": round(float(np.max(array)), 6),
                 "mean": round(float(np.mean(array)), 6),
+                "stddev": round(float(np.std(array, ddof=1)), 6) if len(array) > 1 else 0.0,
                 "lsl": lsl,
                 "usl": usl,
                 "density": _kde(values.values),
@@ -470,6 +483,8 @@ def analyze_parquet(
             "first_pass_qty": first_pass_qty,
             "final_pass_qty": final_pass_qty,
             "final_ng_qty": final_ng_qty,
+            "final_fail_qty": final_fail_qty,
+            "final_error_qty": final_error_qty,
             "first_pass_rate": _ratio(first_pass_qty, total_input),
             "final_pass_rate": _ratio(final_pass_qty, total_input),
             "retest_pass_qty": retest_pass_qty,

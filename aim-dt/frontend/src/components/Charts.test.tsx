@@ -11,6 +11,8 @@ describe('KpiGrid', () => {
           first_pass_qty: 0,
           final_pass_qty: 0,
           final_ng_qty: 90,
+          final_fail_qty: 90,
+          final_error_qty: 0,
           first_pass_rate: 0,
           final_pass_rate: 0,
           retest_pass_qty: 0,

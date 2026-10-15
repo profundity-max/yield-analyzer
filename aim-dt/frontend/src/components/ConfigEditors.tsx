@@ -73,13 +73,13 @@ function CategorySelect({ value, categories, onChange }: { value: string; catego
   return <select value={value} onChange={(event) => onChange(event.target.value)}><option value="Unassigned">请选择</option>{categories.filter((item) => item.active).map((item) => <option key={item.id} value={item.code}>{item.label}</option>)}</select>
 }
 
-export function MappingEditorModal({ batchId, mappingId, onClose, onSaved }: { batchId: string; mappingId?: string; onClose: () => void; onSaved: (mappingId: string) => void }) {
+export function MappingEditorModal({ batchId, mappingId, onClose, onSaved }: { batchId?: string; mappingId?: string; onClose: () => void; onSaved: (mappingId: string) => void }) {
   const queryClient = useQueryClient()
   const [name, setName] = useState('D-T Mapping V2')
   const [rows, setRows] = useState<MappingEditorRow[]>([])
   const editorQuery = useQuery({ queryKey: ['mapping-editor', batchId, mappingId], queryFn: () => api.mappingEditor(batchId, mappingId) })
   const save = useMutation({
-    mutationFn: () => api.saveMappingEditor(batchId, name, rows),
+    mutationFn: () => api.saveMappingEditor(batchId ?? null, name, rows),
     onSuccess: async (result) => {
       await queryClient.invalidateQueries({ queryKey: ['mapping-editor'] })
       await queryClient.invalidateQueries({ queryKey: ['config-options'] })

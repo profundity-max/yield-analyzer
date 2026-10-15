@@ -11,6 +11,7 @@ from app.config import get_settings
 from app.models import AnalysisRun, Batch, Category, MappingVersion, SpecVersion
 from app.services.analytics import analyze_parquet
 from app.services.batches import process_batch
+from app.services.master import complete_refresh_log
 from app.services.rules import load_json
 
 settings = get_settings()
@@ -39,7 +40,10 @@ def recover_stale_jobs(db: Session) -> None:
 
 def claim_batch(db: Session) -> Batch | None:
     batch = db.scalar(
-        select(Batch).where(Batch.status == "uploaded").order_by(Batch.created_at).limit(1)
+        select(Batch)
+        .where(Batch.status.in_(["uploaded", "replacement_pending"]))
+        .order_by(Batch.created_at)
+        .limit(1)
     )
     if batch is None:
         return None
@@ -131,6 +135,7 @@ def process_analysis(db: Session, run: AnalysisRun) -> dict:
         run.completed_at = utcnow_naive()
         run.heartbeat_at = run.completed_at
         db.commit()
+        complete_refresh_log(db, run)
         return summary
     except JobCancelled:
         db.rollback()
@@ -138,6 +143,7 @@ def process_analysis(db: Session, run: AnalysisRun) -> dict:
         run.phase = "cancelled"
         run.completed_at = utcnow_naive()
         db.commit()
+        complete_refresh_log(db, run)
         raise
     except Exception as exc:
         db.rollback()
@@ -146,6 +152,7 @@ def process_analysis(db: Session, run: AnalysisRun) -> dict:
         run.error_message = str(exc)
         run.completed_at = utcnow_naive()
         db.commit()
+        complete_refresh_log(db, run)
         raise
 
 

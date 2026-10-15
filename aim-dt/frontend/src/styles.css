@@ -181,3 +181,12 @@ input:focus, select:focus, textarea:focus { border-color: var(--blue); box-shado
   .workspace-header, .config-toolbar { grid-template-columns: 1fr; display: grid; }
   .modal-card { width: calc(100vw - 20px); }
 }
+
+.version-chip { display: inline-flex; align-items: center; padding: 8px 10px; border-radius: 999px; background: #eef5fc; color: #315d86; font-size: 11px; font-weight: 800; white-space: nowrap; }
+.master-summary { margin: 18px 0; }
+.master-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.compact-log { max-height: 360px; }
+.stat-mean { color: var(--green); font-weight: 800; }
+.stat-sigma { color: var(--amber); font-weight: 800; }
+@media (max-width: 800px) { .master-metrics { grid-template-columns: repeat(2, 1fr); } }

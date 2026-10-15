@@ -6,8 +6,9 @@ from pathlib import Path
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import AnalysisRun, Batch, MappingVersion, SpecVersion, User
-from app.services.configurations import ensure_default_spec, link_analysis_batches
+from app.models import Batch, SpecVersion, User
+from app.services.configurations import ensure_default_spec
+from app.services.master import activate_batch, create_master_analysis, record_refresh_failure
 from app.services.parser import DEFAULT_POINTS, parse_file, write_parquet
 from app.services.rules import canonical_json, fingerprint
 
@@ -64,30 +65,23 @@ def process_batch(db: Session, batch: Batch) -> None:
         batch.status = "ready"
         batch.ready_at = utcnow_naive()
         db.flush()
-        if parsed.spec is not None:
-            spec_for_run = db.scalar(
-                select(SpecVersion).where(SpecVersion.fingerprint == spec_hash)
-            )
-        else:
-            spec_for_run = ensure_default_spec(db, created_by=batch.created_by)
-        mapping_for_run = db.scalar(
-            select(MappingVersion).where(MappingVersion.status == "active").limit(1)
-        )
-        if spec_for_run is not None:
-            run = AnalysisRun(
-                name=f"{Path(batch.original_name).stem} 自动分析",
-                filters_json=canonical_json({"batch_ids": [batch.id]}),
-                spec_version_id=spec_for_run.id,
-                mapping_version_id=mapping_for_run.id if mapping_for_run else None,
-                requested_by=batch.created_by,
-            )
-            db.add(run)
-            db.flush()
-            link_analysis_batches(db, run, [batch.id])
+        ensure_default_spec(db, created_by=batch.created_by)
+        from_batch_id = batch.replaced_from_batch_id
+        module = activate_batch(db, batch, created_by=batch.created_by)
         db.commit()
+        create_master_analysis(
+            db,
+            trigger="replace_file" if from_batch_id else "upload_file",
+            requested_by=batch.created_by,
+            module_id=module.id,
+            from_batch_id=from_batch_id,
+            to_batch_id=batch.id,
+            detail={"filename": batch.original_name, "revision": batch.revision},
+        )
     except Exception as exc:
         db.rollback()
         batch.status = "failed"
         batch.error_message = str(exc)
         db.commit()
+        record_refresh_failure(db, batch, str(exc))
         raise

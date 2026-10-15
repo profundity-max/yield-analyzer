@@ -6,7 +6,15 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 Role = Literal["admin", "analyst", "viewer"]
-BatchStatus = Literal["uploaded", "validating", "importing", "ready", "deleting", "failed"]
+BatchStatus = Literal[
+    "uploaded",
+    "replacement_pending",
+    "validating",
+    "importing",
+    "ready",
+    "deleting",
+    "failed",
+]
 AnalysisStatus = Literal[
     "queued",
     "running",
@@ -127,6 +135,57 @@ class BatchView(BaseModel):
     error_message: str | None
     created_at: datetime
     ready_at: datetime | None
+    data_module_id: str | None = None
+    revision: int = 1
+    is_active: bool = False
+    file_deleted: bool = False
+
+
+class DataModuleView(BaseModel):
+    id: str
+    name: str
+    active_batch_id: str | None
+    active_filename: str | None
+    active_revision: int
+    row_count: int
+    event_count: int
+    status: str
+    uploaded_at: datetime
+    previous_batch_id: str | None = None
+    previous_filename: str | None = None
+    previous_revision: int | None = None
+    previous_available: bool = False
+
+
+class RefreshLogView(BaseModel):
+    id: str
+    module_id: str | None
+    module_name: str | None
+    trigger: str
+    status: str
+    analysis_run_id: str | None
+    from_filename: str | None
+    to_filename: str | None
+    detail: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime
+    completed_at: datetime | None
+
+
+class MasterWorkbench(BaseModel):
+    master_id: str
+    name: str
+    current_analysis_id: str | None
+    last_success_analysis_id: str | None
+    analysis_status: AnalysisStatus | None = None
+    stage: str = "idle"
+    progress: float = 0
+    module_count: int = 0
+    total_rows: int = 0
+    total_events: int = 0
+    unmatched_count: int = 0
+    modules: list[DataModuleView] = Field(default_factory=list)
+    logs: list[RefreshLogView] = Field(default_factory=list)
+    error_message: str | None = None
 
 
 class AnalysisCreate(BaseModel):
@@ -228,7 +287,7 @@ class MappingEditorRow(BaseModel):
 
 class MappingEditorPayload(BaseModel):
     name: str
-    batch_id: str
+    batch_id: str | None = None
     rows: list[MappingEditorRow]
 
 

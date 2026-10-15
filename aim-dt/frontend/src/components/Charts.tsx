@@ -2,7 +2,11 @@ import { useEffect, useState } from 'react'
 import ReactECharts from 'echarts-for-react'
 import type { CellYieldPoint, DistributionPoint, Kpis, ParetoPoint, Summary, TesterYieldPoint, TimeYieldPoint } from '../types'
 
-const colors = ['#1d70b8', '#19a974', '#f4a261', '#d64545', '#7b61ff', '#00a6a6']
+const PASS_GREEN = '#19a974'
+const FAIL_RED = '#d64545'
+const ERROR_YELLOW = '#e6b422'
+const NEUTRAL_BLUE = '#1d70b8'
+const colors = [PASS_GREEN, FAIL_RED, ERROR_YELLOW, NEUTRAL_BLUE, '#7b61ff', '#00a6a6']
 
 export function formatPct(value: number | null | undefined) {
   return value == null ? '—' : `${(value * 100).toFixed(2)}%`
@@ -47,9 +51,10 @@ export function TimeYieldChart({ rows }: { rows: TimeYieldPoint[] }) {
           { type: 'value', name: 'Yield', min: 0, max: 1, axisLabel: { formatter: (value: number) => `${Math.round(value * 100)}%` } },
         ],
         series: [
-          { name: 'Input Qty', type: 'bar', data: rows.map((row) => row.input_qty) },
-          { name: 'Pass Qty', type: 'bar', data: rows.map((row) => row.pass_qty) },
-          { name: 'Fail & Error Qty', type: 'bar', data: rows.map((row) => row.fail_error_qty) },
+          { name: 'Input Qty', type: 'bar', itemStyle: { color: NEUTRAL_BLUE }, data: rows.map((row) => row.input_qty) },
+          { name: 'Pass Qty', type: 'bar', itemStyle: { color: PASS_GREEN }, data: rows.map((row) => row.pass_qty) },
+          { name: 'Fail Qty', type: 'bar', itemStyle: { color: FAIL_RED }, data: rows.map((row) => row.fail_qty) },
+          { name: 'Error Qty', type: 'bar', itemStyle: { color: ERROR_YELLOW }, data: rows.map((row) => row.error_qty) },
           { name: 'Yield Rate', type: 'line', yAxisIndex: 1, data: rows.map((row) => row.yield_rate), smooth: true },
         ],
       }}
@@ -78,7 +83,7 @@ export function ParetoChart({ rows }: { rows: ParetoPoint[] }) {
           { type: 'value', name: 'Cumulative', min: 0, max: 1, axisLabel: { formatter: (value: number) => `${Math.round(value * 100)}%` } },
         ],
         series: [
-          { name: 'NG Count', type: 'bar', barMaxWidth: 54, data: rows.map((row) => row.count) },
+          { name: 'NG Count', type: 'bar', barMaxWidth: 54, data: rows.map((row) => ({ value: row.count, itemStyle: { color: row.outcome === 'ERROR' ? ERROR_YELLOW : FAIL_RED } })) },
           { name: 'Cumulative %', type: 'line', yAxisIndex: 1, symbolSize: 7, data: cumulativeRows.map((value) => value / total) },
         ],
       }}
@@ -95,7 +100,7 @@ export function CellYieldPanel({ rows }: { rows: CellYieldPoint[] }) {
           <ReactECharts
             style={{ height: 230 }}
             option={{
-              color: ['#19a974', '#f4b942', '#d64545'],
+              color: [PASS_GREEN, '#72c89f', FAIL_RED, ERROR_YELLOW],
               tooltip: { trigger: 'item' },
               series: [
                 {
@@ -105,7 +110,8 @@ export function CellYieldPanel({ rows }: { rows: CellYieldPoint[] }) {
                   data: [
                     { name: 'First Pass', value: row.first_pass },
                     { name: 'Retest Pass', value: row.retest_pass },
-                    { name: 'Final NG', value: row.final_ng },
+                    { name: 'Final Fail', value: row.final_fail },
+                    { name: 'Final Error', value: row.final_error },
                   ],
                 },
               ],
@@ -146,9 +152,9 @@ export function TesterYieldPanel({ rows }: { rows: TesterYieldPoint[] }) {
                 { type: 'value', name: 'Yield', min: 0, max: 1, axisLabel: { formatter: (value: number) => `${Math.round(value * 100)}%` } },
               ],
               series: [
-                { name: 'Pass Qty', type: 'bar', data: items.map((item) => item.pass_qty) },
-                { name: 'Fail Qty', type: 'bar', data: items.map((item) => item.fail_qty) },
-                { name: 'Error Qty', type: 'bar', data: items.map((item) => item.error_qty) },
+                { name: 'Pass Qty', type: 'bar', itemStyle: { color: PASS_GREEN }, data: items.map((item) => item.pass_qty) },
+                { name: 'Fail Qty', type: 'bar', itemStyle: { color: FAIL_RED }, data: items.map((item) => item.fail_qty) },
+                { name: 'Error Qty', type: 'bar', itemStyle: { color: ERROR_YELLOW }, data: items.map((item) => item.error_qty) },
                 { name: 'Yield Rate', type: 'line', yAxisIndex: 1, data: items.map((item) => item.yield_rate) },
               ],
             }}
@@ -165,7 +171,9 @@ export function DistributionPanel({ summary }: { summary: Summary }) {
   useEffect(() => {
     if (!cells.includes(cell)) setCell(cells[0] ?? 'Unassigned')
   }, [cell, cells])
-  const rows = summary.distribution.filter((row) => row.cell === cell)
+  const rows = summary.distribution
+    .filter((row) => row.cell === cell)
+    .sort((a, b) => a.point.localeCompare(b.point, undefined, { numeric: true }))
   return (
     <div>
       <div className="toolbar">
@@ -175,50 +183,38 @@ export function DistributionPanel({ summary }: { summary: Summary }) {
             {cells.map((item) => <option key={item}>{item}</option>)}
           </select>
         </label>
-      </div>
-      <div className="distribution-grid">
-        {rows.map((row) => <DistributionCard key={row.point} row={row} />)}
-      </div>
-    </div>
-  )
-}
-
-function DistributionCard({ row }: { row: DistributionPoint }) {
-  const kde = row.density.map((item) => [item.x, item.density])
-  return (
-    <div className="distribution-card">
-      <div className="distribution-head">
-        <strong>{row.point}</strong>
-        <span>{row.count.toLocaleString()} 条{row.sampled ? ' · 抽样 KDE' : ''}</span>
+        <span className="muted">箱线图：从上到下排列测试点，数值分布沿横向展开</span>
       </div>
       <ReactECharts
-        style={{ height: 220 }}
+        style={{ height: Math.max(320, rows.length * 62) }}
         option={{
-          color: ['#7b61ff'],
-          tooltip: { trigger: 'axis' },
-          grid: { left: 45, right: 20, top: 15, bottom: 35 },
-          xAxis: { type: 'value', name: 'Value' },
-          yAxis: { type: 'value', name: 'Density', axisLabel: { show: false }, splitLine: { show: false } },
+          color: [NEUTRAL_BLUE],
+          tooltip: { trigger: 'item' },
+          grid: { left: 105, right: 45, top: 30, bottom: 45 },
+          xAxis: { type: 'value', name: '测量值' },
+          yAxis: { type: 'category', inverse: true, data: rows.map((row) => row.point) },
           series: [
             {
-              type: 'line',
-              data: kde,
-              smooth: true,
-              showSymbol: false,
-              areaStyle: { opacity: 0.3 },
-              markLine: {
-                symbol: 'none',
-                data: [
-                  ...(row.lsl == null ? [] : [{ xAxis: row.lsl, name: 'LSL' }]),
-                  ...(row.usl == null ? [] : [{ xAxis: row.usl, name: 'USL' }]),
-                ],
+              name: '数据分布',
+              type: 'boxplot',
+              itemStyle: { color: '#dcecff', borderColor: NEUTRAL_BLUE, borderWidth: 2 },
+              data: rows.map((row) => [row.min, row.q1, row.median, row.q3, row.max]),
+              markPoint: {
+                symbol: 'diamond',
+                symbolSize: 9,
+                data: rows.map((row) => ({ coord: [row.mean, row.point], value: row.mean })),
+                itemStyle: { color: PASS_GREEN },
+                label: { formatter: (params: { data: { value: number } }) => `均值 ${params.data.value}` },
               },
             },
           ],
         }}
       />
-      <div className="mini-stats">
-        <span>Min {row.min}</span><span>Q1 {row.q1}</span><span>Median {row.median}</span><span>Q3 {row.q3}</span><span>Max {row.max}</span>
+      <div className="table-wrap">
+        <table>
+          <thead><tr><th>测试点</th><th>样本数</th><th>均值</th><th>最小值</th><th>最大值</th><th>σ</th><th>LSL</th><th>USL</th></tr></thead>
+          <tbody>{rows.map((row) => <tr key={row.point}><td><strong>{row.point}</strong></td><td>{row.count.toLocaleString()}</td><td className="stat-mean">{row.mean}</td><td>{row.min}</td><td>{row.max}</td><td className="stat-sigma">{row.stddev}</td><td>{row.lsl ?? '—'}</td><td>{row.usl ?? '—'}</td></tr>)}</tbody>
+        </table>
       </div>
     </div>
   )

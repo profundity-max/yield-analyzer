@@ -14,10 +14,19 @@ interface Props {
   analysisId: string
   batchId?: string
   onRunChange?: (id: string) => void
+  onMasterRefresh?: () => void
+  masterMode?: boolean
   embedded?: boolean
 }
 
-export function AnalysisWorkspace({ analysisId, batchId, onRunChange, embedded = false }: Props) {
+export function AnalysisWorkspace({
+  analysisId,
+  batchId,
+  onRunChange,
+  onMasterRefresh,
+  masterMode = false,
+  embedded = false,
+}: Props) {
   const { user } = useAuth()
   const queryClient = useQueryClient()
   const canEdit = user.role === 'admin' || user.role === 'analyst'
@@ -43,7 +52,7 @@ export function AnalysisWorkspace({ analysisId, batchId, onRunChange, embedded =
   const optionsQuery = useQuery({
     queryKey: ['config-options', effectiveBatchId],
     queryFn: () => api.configOptions(effectiveBatchId),
-    enabled: Boolean(effectiveBatchId),
+    enabled: Boolean(masterMode || effectiveBatchId),
   })
   const summaryQuery = useQuery({
     queryKey: ['summary', analysisId],
@@ -99,6 +108,8 @@ export function AnalysisWorkspace({ analysisId, batchId, onRunChange, embedded =
     setMappingOpen(false)
     rerun.mutate({ specId: run.spec_version_id, mappingId })
   }
+  const currentSpecName = optionsQuery.data?.specs.find((item) => item.id === run.spec_version_id)?.name ?? run.spec_version_id
+  const currentMappingName = optionsQuery.data?.mappings.find((item) => item.id === run.mapping_version_id)?.name ?? 'Unassigned'
 
   return (
     <div className={embedded ? 'workspace embedded' : 'workspace'}>
@@ -108,25 +119,34 @@ export function AnalysisWorkspace({ analysisId, batchId, onRunChange, embedded =
           <p>{run.status} · {run.phase} · {run.progress.toFixed(1)}%</p>
         </div>
         <div className="header-actions">
-          {canEdit && effectiveBatchId && (
+          {canEdit && (masterMode || effectiveBatchId) && (
             <>
-              <select
-                aria-label="Spec 版本"
-                value={run.spec_version_id}
-                onChange={(event) => changeSpec(event.target.value)}
-                disabled={rerun.isPending}
-              >
-                {optionsQuery.data?.specs.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.status}</option>)}
-              </select>
-              <select
-                aria-label="Mapping 版本"
-                value={run.mapping_version_id ?? ''}
-                onChange={(event) => changeMapping(event.target.value)}
-                disabled={rerun.isPending}
-              >
-                <option value="">Unassigned</option>
-                {optionsQuery.data?.mappings.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.status}</option>)}
-              </select>
+              {masterMode ? (
+                <>
+                  <span className="version-chip">Spec: {currentSpecName}</span>
+                  <span className="version-chip">Mapping: {currentMappingName}</span>
+                </>
+              ) : (
+                <>
+                  <select
+                    aria-label="Spec 版本"
+                    value={run.spec_version_id}
+                    onChange={(event) => changeSpec(event.target.value)}
+                    disabled={rerun.isPending}
+                  >
+                    {optionsQuery.data?.specs.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.status}</option>)}
+                  </select>
+                  <select
+                    aria-label="Mapping 版本"
+                    value={run.mapping_version_id ?? ''}
+                    onChange={(event) => changeMapping(event.target.value)}
+                    disabled={rerun.isPending}
+                  >
+                    <option value="">Unassigned</option>
+                    {optionsQuery.data?.mappings.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.status}</option>)}
+                  </select>
+                </>
+              )}
               <button className="button ghost" onClick={() => setSpecOpen(true)}><Settings2 size={16} /> Spec</button>
               <button className="button ghost" onClick={() => setMappingOpen(true)}><Settings2 size={16} /> Mapping</button>
             </>
@@ -176,10 +196,28 @@ export function AnalysisWorkspace({ analysisId, batchId, onRunChange, embedded =
       )}
 
       {specOpen && canEdit && (
-        <SpecEditorModal batchId={effectiveBatchId} specId={run.spec_version_id} onClose={() => setSpecOpen(false)} onSaved={(specId) => changeSpec(specId)} />
+        <SpecEditorModal
+          batchId={masterMode ? undefined : effectiveBatchId}
+          specId={run.spec_version_id}
+          onClose={() => setSpecOpen(false)}
+          onSaved={(specId) => {
+            setSpecOpen(false)
+            if (masterMode) onMasterRefresh?.()
+            else changeSpec(specId)
+          }}
+        />
       )}
-      {mappingOpen && canEdit && effectiveBatchId && (
-        <MappingEditorModal batchId={effectiveBatchId} mappingId={run.mapping_version_id ?? undefined} onClose={() => setMappingOpen(false)} onSaved={(mappingId) => changeMapping(mappingId)} />
+      {mappingOpen && canEdit && (masterMode || effectiveBatchId) && (
+        <MappingEditorModal
+          batchId={masterMode ? undefined : effectiveBatchId}
+          mappingId={run.mapping_version_id ?? undefined}
+          onClose={() => setMappingOpen(false)}
+          onSaved={(mappingId) => {
+            setMappingOpen(false)
+            if (masterMode) onMasterRefresh?.()
+            else changeMapping(mappingId)
+          }}
+        />
       )}
     </div>
   )

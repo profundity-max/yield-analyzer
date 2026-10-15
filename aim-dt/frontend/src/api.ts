@@ -6,6 +6,7 @@ import type {
   EventRow,
   MappingEditor,
   MappingVersion,
+  MasterWorkbench,
   SessionResponse,
   SpecEditor,
   SpecVersion,
@@ -72,6 +73,18 @@ export const api = {
   workbench: (batchId: string) => apiFetch<WorkbenchState>(`/api/v1/batches/${batchId}/workbench`),
   configOptions: (batchId?: string) =>
     apiFetch<ConfigOptions>(`/api/v1/config/options${batchId ? `?batch_id=${batchId}` : ''}`),
+  masterWorkbench: () => apiFetch<MasterWorkbench>('/api/v1/master/workbench'),
+  refreshMaster: () => apiFetch<AnalysisRun>('/api/v1/master/refresh', { method: 'POST' }),
+  replaceModule: (moduleId: string, file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return apiFetch<Batch>(`/api/v1/master/modules/${moduleId}/replace`, {
+      method: 'POST',
+      body: form,
+    })
+  },
+  revertModule: (moduleId: string) =>
+    apiFetch<AnalysisRun>(`/api/v1/master/modules/${moduleId}/revert`, { method: 'POST' }),
   uploadBatch: (file: File) => {
     const form = new FormData()
     form.append('file', file)
@@ -98,12 +111,13 @@ export const api = {
   },
   saveSpecEditor: (payload: Record<string, unknown>) =>
     apiFetch<SpecEditor>('/api/v1/specs/editor', { method: 'POST', body: JSON.stringify(payload) }),
-  mappingEditor: (batchId: string, mappingVersionId?: string) => {
-    const params = new URLSearchParams({ batch_id: batchId })
+  mappingEditor: (batchId?: string, mappingVersionId?: string) => {
+    const params = new URLSearchParams()
+    if (batchId) params.set('batch_id', batchId)
     if (mappingVersionId) params.set('mapping_version_id', mappingVersionId)
     return apiFetch<MappingEditor>(`/api/v1/mapping-editor?${params.toString()}`)
   },
-  saveMappingEditor: (batchId: string, name: string, rows: unknown[]) =>
+  saveMappingEditor: (batchId: string | null, name: string, rows: unknown[]) =>
     apiFetch<MappingEditor>('/api/v1/mappings/editor', {
       method: 'POST',
       body: JSON.stringify({ batch_id: batchId, name, rows }),
