@@ -59,14 +59,10 @@ def config_options(
     spec = _active_spec(db)
     mapping = _active_mapping(db)
     specs = db.scalars(
-        select(SpecVersion)
-        .where(SpecVersion.status != "retired")
-        .order_by(SpecVersion.created_at.desc())
+        select(SpecVersion).order_by(SpecVersion.created_at.desc())
     ).all()
     mappings = db.scalars(
-        select(MappingVersion)
-        .where(MappingVersion.status != "retired")
-        .order_by(MappingVersion.created_at.desc())
+        select(MappingVersion).order_by(MappingVersion.created_at.desc())
     ).all()
     categories = categories_by_kind(db)
     return {

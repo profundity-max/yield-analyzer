@@ -96,3 +96,74 @@ def test_upload_auto_analysis_mapping_and_rerun(admin_client):
     rerun_summary = admin_client.get(f"/api/v1/analyses/{rerun_id}/summary").json()
     assert rerun_summary["quality"]["unknown_mapping_events"] == 76
     assert rerun_summary["kpis"]["final_ng_qty"] == 78
+
+
+@pytest.mark.skipif(not SAMPLE.exists(), reason="AIM sample workbook not available")
+def test_rerun_accepts_retired_spec_and_mapping(admin_client):
+    with SAMPLE.open("rb") as stream:
+        batch = admin_client.post(
+            "/api/v1/batches",
+            files={"file": (SAMPLE.name, stream, "application/xlsx")},
+        ).json()
+    drain_jobs()
+    workbench = admin_client.get(f"/api/v1/batches/{batch['id']}/workbench").json()
+    first_run_id = workbench["analysis_id"]
+    first_run = admin_client.get(f"/api/v1/analyses/{first_run_id}").json()
+    old_spec_id = first_run["spec_version_id"]
+
+    admin_client.post(f"/api/v1/admin/specs/{old_spec_id}/confirm")
+    editor = admin_client.get(
+        f"/api/v1/specs/editor?spec_id={old_spec_id}&batch_id={batch['id']}"
+    ).json()
+    new_spec = admin_client.post(
+        "/api/v1/specs/editor",
+        json={"name": "V3 重算规格", "points": editor["points"], "source_batch_id": batch["id"]},
+    ).json()
+    assert new_spec["id"] != old_spec_id
+
+    old_mapping_payload = {
+        "name": "历史 Mapping",
+        "batch_id": batch["id"],
+        "rows": [
+            {
+                "source": {
+                    "site_name": "V7X_P_Delta_T",
+                    "equipment_id": "L1_P_Delta_T_1@965N1",
+                    "config": "V965N1",
+                    "slot": "1",
+                },
+                "target": {"cell": "Cell-1", "tester": "T01", "qpl": "QPL1"},
+                "match_count": 15,
+                "status": "mapped",
+            }
+        ],
+    }
+    old_mapping_id = admin_client.post("/api/v1/mappings/editor", json=old_mapping_payload).json()[
+        "mapping_version_id"
+    ]
+    new_mapping_payload = {
+        **old_mapping_payload,
+        "name": "最新 Mapping",
+        "rows": [
+            {
+                **old_mapping_payload["rows"][0],
+                "target": {"cell": "Cell-2", "tester": "T01", "qpl": "QPL1"},
+            }
+        ],
+    }
+    admin_client.post("/api/v1/mappings/editor", json=new_mapping_payload)
+
+    options = admin_client.get(f"/api/v1/config/options?batch_id={batch['id']}").json()
+    assert old_spec_id in {item["id"] for item in options["specs"]}
+    assert old_mapping_id in {item["id"] for item in options["mappings"]}
+
+    response = admin_client.post(
+        f"/api/v1/analyses/{first_run_id}/rerun-with",
+        json={"spec_version_id": old_spec_id, "mapping_version_id": old_mapping_id},
+    )
+    assert response.status_code == 202, response.text
+    drain_jobs()
+    rerun = admin_client.get(f"/api/v1/analyses/{response.json()['id']}").json()
+    assert rerun["spec_version_id"] == old_spec_id
+    assert rerun["mapping_version_id"] == old_mapping_id
+    assert rerun["status"] in {"completed", "completed_with_warnings"}

@@ -24,9 +24,9 @@ export function SpecEditorModal({ batchId, specId, onClose, onSaved }: { batchId
   const optionsQuery = useQuery({ queryKey: ['config-options', batchId], queryFn: () => api.configOptions(batchId) })
   const save = useMutation({
     mutationFn: () => api.saveSpecEditor({ name, points, source_batch_id: batchId ?? null }),
-    onSuccess: (result) => {
-      void queryClient.invalidateQueries({ queryKey: ['config-options'] })
-      void queryClient.invalidateQueries({ queryKey: ['spec-editor'] })
+    onSuccess: async (result) => {
+      await queryClient.invalidateQueries({ queryKey: ['config-options'] })
+      await queryClient.invalidateQueries({ queryKey: ['spec-editor'] })
       onSaved(result.id)
     },
   })
@@ -80,9 +80,9 @@ export function MappingEditorModal({ batchId, mappingId, onClose, onSaved }: { b
   const editorQuery = useQuery({ queryKey: ['mapping-editor', batchId, mappingId], queryFn: () => api.mappingEditor(batchId, mappingId) })
   const save = useMutation({
     mutationFn: () => api.saveMappingEditor(batchId, name, rows),
-    onSuccess: (result) => {
-      void queryClient.invalidateQueries({ queryKey: ['mapping-editor'] })
-      void queryClient.invalidateQueries({ queryKey: ['config-options'] })
+    onSuccess: async (result) => {
+      await queryClient.invalidateQueries({ queryKey: ['mapping-editor'] })
+      await queryClient.invalidateQueries({ queryKey: ['config-options'] })
       if (result.mapping_version_id) onSaved(result.mapping_version_id)
     },
   })

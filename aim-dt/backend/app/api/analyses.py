@@ -158,13 +158,13 @@ def rerun_with(
 ) -> AnalysisView:
     source = _get_run(db, run_id)
     spec = db.get(SpecVersion, payload.spec_version_id)
-    if spec is None or spec.status == "retired":
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="规格版本不可用")
+    if spec is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="规格版本不存在")
     if payload.mapping_version_id:
         mapping = db.get(MappingVersion, payload.mapping_version_id)
-        if mapping is None or mapping.status == "retired":
+        if mapping is None:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail="Mapping 版本不可用"
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Mapping 版本不存在"
             )
     run = AnalysisRun(
         name=f"{source.name} · 重算",

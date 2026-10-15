@@ -68,7 +68,7 @@ export function DashboardPage() {
   return (
     <div className="page">
       <header className="page-header">
-        <div><span className="eyebrow">AIM D-T · V2.0</span><h1>分析中心</h1><p>上传后在当前页面自动解析、分析并展示结果图。</p></div>
+        <div><span className="eyebrow">AIM D-T · V2.0.1</span><h1>分析中心</h1><p>上传后在当前页面自动解析、分析并展示结果图。</p></div>
         <button className="icon-button" onClick={() => void queryClient.invalidateQueries()}><RefreshCw size={18} /></button>
       </header>
 

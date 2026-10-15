@@ -87,9 +87,16 @@ export function AnalysisWorkspace({ analysisId, batchId, onRunChange, embedded =
   const run = runQuery.data
 
   const changeSpec = (specId: string) => {
-    rerun.mutate({ specId, mappingId: run.mapping_version_id ?? optionsQuery.data?.active_mapping_id ?? null })
+    setSpecOpen(false)
+    setMappingOpen(false)
+    rerun.mutate({
+      specId,
+      mappingId: run.mapping_version_id ?? optionsQuery.data?.active_mapping_id ?? null,
+    })
   }
   const changeMapping = (mappingId: string) => {
+    setSpecOpen(false)
+    setMappingOpen(false)
     rerun.mutate({ specId: run.spec_version_id, mappingId })
   }
 
@@ -109,7 +116,7 @@ export function AnalysisWorkspace({ analysisId, batchId, onRunChange, embedded =
                 onChange={(event) => changeSpec(event.target.value)}
                 disabled={rerun.isPending}
               >
-                {optionsQuery.data?.specs.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                {optionsQuery.data?.specs.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.status}</option>)}
               </select>
               <select
                 aria-label="Mapping 版本"
@@ -118,7 +125,7 @@ export function AnalysisWorkspace({ analysisId, batchId, onRunChange, embedded =
                 disabled={rerun.isPending}
               >
                 <option value="">Unassigned</option>
-                {optionsQuery.data?.mappings.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                {optionsQuery.data?.mappings.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.status}</option>)}
               </select>
               <button className="button ghost" onClick={() => setSpecOpen(true)}><Settings2 size={16} /> Spec</button>
               <button className="button ghost" onClick={() => setMappingOpen(true)}><Settings2 size={16} /> Mapping</button>
@@ -134,6 +141,12 @@ export function AnalysisWorkspace({ analysisId, batchId, onRunChange, embedded =
           )}
         </div>
       </div>
+
+      {rerun.isError && (
+        <div className="form-error">
+          配置已保存，但重新分析失败：{rerun.error.message}
+        </div>
+      )}
 
       {!complete && (
         <section className="panel running-panel">

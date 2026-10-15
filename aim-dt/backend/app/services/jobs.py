@@ -68,8 +68,8 @@ def claim_analysis(db: Session) -> AnalysisRun | None:
 def process_analysis(db: Session, run: AnalysisRun) -> dict:
     try:
         spec = db.get(SpecVersion, run.spec_version_id)
-        if spec is None or spec.status == "retired":
-            raise ValueError("规格版本不存在或已退役")
+        if spec is None:
+            raise ValueError("规格版本不存在")
         filters = json.loads(run.filters_json)
         batch_ids = filters.get("batch_ids") or []
         batch_query = select(Batch).where(Batch.status == "ready")
@@ -84,8 +84,8 @@ def process_analysis(db: Session, run: AnalysisRun) -> dict:
         mapping_rules: list[dict] = []
         if run.mapping_version_id:
             mapping = db.get(MappingVersion, run.mapping_version_id)
-            if mapping is None or mapping.status == "retired":
-                raise ValueError("Mapping 版本不存在或已退役")
+            if mapping is None:
+                raise ValueError("Mapping 版本不存在")
             mapping_rules = load_json(mapping.rules_json, [])
         spec_rules = {
             "enabled_points": load_json(spec.enabled_points_json, []),
