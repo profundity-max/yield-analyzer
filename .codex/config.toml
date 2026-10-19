@@ -1,0 +1,25 @@
+[features.multi_agent_v2]
+enabled = true
+
+[agents]
+enabled = true
+max_concurrent_threads_per_session = 2
+max_depth = 1
+default_subagent_reasoning_effort = "high"
+interrupt_message = true
+
+[agents.planner]
+description = "任务规划角色。负责拆解需求、依赖关系、文件所有权和验收标准，不直接实现代码。"
+config_file = "./agents/planner.toml"
+
+[agents.backend]
+description = "后端工程角色。负责服务端、API、数据库、业务逻辑和后端测试。"
+config_file = "./agents/backend.toml"
+
+[agents.frontend_ui]
+description = "前端 UI 角色。负责视觉设计、页面实现、响应式、交互状态和前端测试。"
+config_file = "./agents/frontend_ui.toml"
+
+[agents.qa]
+description = "测试角色。负责独立验证、边界条件、回归测试和缺陷报告。"
+config_file = "./agents/qa.toml"
